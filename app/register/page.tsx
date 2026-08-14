@@ -10,9 +10,19 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Checkbox } from "@/components/ui/checkbox"
+import { useAuth } from "@/lib/auth-context"
+
+function initialsFor(fullName: string) {
+  const parts = fullName.trim().split(/\s+/).filter(Boolean)
+  const initials = parts.slice(0, 2).map((part) => part[0]?.toUpperCase() ?? "")
+  return initials.join("") || "AG"
+}
 
 export default function RegisterPage() {
   const router = useRouter()
+  const { loginAsUser } = useAuth()
+  const [fullName, setFullName] = useState("")
+  const [email, setEmail] = useState("")
   const [agreed, setAgreed] = useState(false)
   const [loading, setLoading] = useState(false)
 
@@ -20,9 +30,18 @@ export default function RegisterPage() {
     e.preventDefault()
     if (!agreed) return
     setLoading(true)
-    // Demo-only: creates no real account yet — routes into the application
-    // wizard so a brand-new agent can start their onboarding immediately.
-    setTimeout(() => router.push("/agent/applications/new"), 500)
+    // Demo-only: no backend account is created — this starts a session for
+    // the new agent so they can move straight into the application wizard.
+    setTimeout(() => {
+      loginAsUser({
+        role: "agent",
+        name: fullName || "New Agent",
+        email: email || "new.agent@kinetic.co.tz",
+        title: "Registered Agent",
+        initials: initialsFor(fullName || "New Agent"),
+      })
+      router.push("/agent/applications/new")
+    }, 500)
   }
 
   return (
@@ -41,7 +60,14 @@ export default function RegisterPage() {
       <form onSubmit={handleSubmit} className="flex flex-col gap-4">
         <div className="flex flex-col gap-1.5">
           <Label htmlFor="fullName">Full name</Label>
-          <Input id="fullName" placeholder="Enter your full name" required className="h-10" />
+          <Input
+            id="fullName"
+            placeholder="Enter your full name"
+            value={fullName}
+            onChange={(e) => setFullName(e.target.value)}
+            required
+            className="h-10"
+          />
         </div>
 
         <div className="flex flex-col gap-1.5">
@@ -51,7 +77,15 @@ export default function RegisterPage() {
 
         <div className="flex flex-col gap-1.5">
           <Label htmlFor="regEmail">Email address</Label>
-          <Input id="regEmail" type="email" placeholder="Enter your email" required className="h-10" />
+          <Input
+            id="regEmail"
+            type="email"
+            placeholder="Enter your email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            required
+            className="h-10"
+          />
         </div>
 
         <div className="grid grid-cols-2 gap-3">

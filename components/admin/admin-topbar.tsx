@@ -1,7 +1,8 @@
 "use client"
 
 import { useState } from "react"
-import { Bell, Search, Menu, X } from "lucide-react"
+import { useRouter } from "next/navigation"
+import { Bell, LogOut, Search, Menu, X } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import {
@@ -15,9 +16,22 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { Button } from "@/components/ui/button"
 import { AdminMobileNav } from "@/components/admin/admin-mobile-nav"
+import { useAuth } from "@/lib/auth-context"
 
 export function AdminTopbar() {
   const [mobileNavOpen, setMobileNavOpen] = useState(false)
+  const { user, logout } = useAuth()
+  const router = useRouter()
+
+  const name = user?.name ?? "Admin User"
+  const title = user?.title ?? "Super Administrator"
+  const email = user?.email ?? "admin@kinetic.co.tz"
+  const initials = user?.initials ?? "AU"
+
+  function handleLogout() {
+    logout()
+    router.push("/login")
+  }
 
   return (
     <header className="flex h-16 items-center gap-4 border-b border-border bg-background px-4 md:px-6">

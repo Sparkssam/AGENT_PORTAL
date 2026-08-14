@@ -61,6 +61,7 @@ export function AgentTopbar() {
           size="icon"
           className="relative"
           aria-label="Notifications"
+          nativeButton={false}
           render={<Link href="/agent/notifications" />}
         >
           <Bell />

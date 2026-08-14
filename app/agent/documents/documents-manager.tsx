@@ -1,17 +1,33 @@
 "use client"
 
 import { useState } from "react"
-import { CheckCircle2, Eye, FileText, ImageIcon, RefreshCw, Upload, AlertTriangle } from "lucide-react"
+import { CheckCircle2, Download, Eye, FileText, ImageIcon, RefreshCw, Upload, AlertTriangle } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { DocumentStatusLabel } from "@/components/admin/status-badge"
 import { cn } from "@/lib/utils"
-import type { Document } from "@/lib/admin-data"
+import { buildDocumentFileName, getDocumentFile, type Document } from "@/lib/admin-data"
+import { downloadFile } from "@/lib/download"
 
-export function DocumentsManager({ documents }: { documents: Document[] }) {
+export function DocumentsManager({
+  documents,
+  agentName,
+  network,
+}: {
+  documents: Document[]
+  agentName: string
+  network: string
+}) {
   const [docs, setDocs] = useState(documents)
 
   function markUploaded(id: string) {
     setDocs((prev) => prev.map((d) => (d.id === id ? { ...d, status: "unverified" } : d)))
+  }
+
+  function handleDownload(doc: Document) {
+    const file = getDocumentFile(doc)
+    if (!file) return
+    const filename = buildDocumentFileName({ agentName, docName: doc.name, network, extension: file.extension })
+    void downloadFile(file.url, filename)
   }
 
   return (
@@ -68,6 +84,12 @@ export function DocumentsManager({ documents }: { documents: Document[] }) {
                     <Button size="sm" variant="outline" className="flex-1">
                       <Eye data-icon="inline-start" />
                       Preview
+                    </Button>
+                  )}
+                  {getDocumentFile(doc) && (
+                    <Button size="sm" variant="outline" className="flex-1" onClick={() => handleDownload(doc)}>
+                      <Download data-icon="inline-start" />
+                      Download
                     </Button>
                   )}
                   <Button size="sm" variant="outline" className="flex-1" onClick={() => markUploaded(doc.id)}>

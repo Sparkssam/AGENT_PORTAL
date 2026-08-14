@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react"
 import Image from "next/image"
 import Link from "next/link"
-import { FileText, ImageOff, Search } from "lucide-react"
+import { Download, FileText, ImageOff, Search } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Badge } from "@/components/ui/badge"
@@ -17,13 +17,21 @@ import {
   SheetFooter,
   SheetClose,
 } from "@/components/ui/sheet"
-import { applications, type Document, type DocumentStatus } from "@/lib/admin-data"
+import {
+  applications,
+  buildDocumentFileName,
+  getDocumentFile,
+  type Document,
+  type DocumentStatus,
+} from "@/lib/admin-data"
+import { downloadFile } from "@/lib/download"
 import { cn } from "@/lib/utils"
 
 interface FlatDocument extends Document {
   appId: string
   appNumber: string
   agentName: string
+  channel: string
 }
 
 const allDocuments: FlatDocument[] = applications.flatMap((app) =>
@@ -32,8 +40,21 @@ const allDocuments: FlatDocument[] = applications.flatMap((app) =>
     appId: app.id,
     appNumber: app.appNumber,
     agentName: app.agentName,
+    channel: app.channel,
   })),
 )
+
+function downloadDocument(doc: FlatDocument) {
+  const file = getDocumentFile(doc)
+  if (!file) return
+  const filename = buildDocumentFileName({
+    agentName: doc.agentName,
+    docName: doc.name,
+    network: doc.channel,
+    extension: file.extension,
+  })
+  void downloadFile(file.url, filename)
+}
 
 const documentTypeLabels: Record<string, string> = {
   id_front: "ID Card Front",
@@ -181,6 +202,7 @@ export function DocumentsTable() {
               <th className="px-4 py-3 font-medium">Agent</th>
               <th className="px-4 py-3 font-medium">Verified by</th>
               <th className="px-4 py-3 font-medium">Status</th>
+              <th className="px-4 py-3 text-right font-medium">Download</th>
             </tr>
           </thead>
           <tbody>
@@ -210,11 +232,25 @@ export function DocumentsTable() {
                 <td className="px-4 py-3">
                   <DocStatusBadge status={doc.status} />
                 </td>
+                <td className="px-4 py-3 text-right">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={!getDocumentFile(doc)}
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      downloadDocument(doc)
+                    }}
+                  >
+                    <Download data-icon="inline-start" />
+                    Download
+                  </Button>
+                </td>
               </tr>
             ))}
             {paged.length === 0 && (
               <tr>
-                <td colSpan={5} className="px-4 py-10 text-center text-sm text-muted-foreground">
+                <td colSpan={6} className="px-4 py-10 text-center text-sm text-muted-foreground">
                   No documents match your filters.
                 </td>
               </tr>
@@ -313,8 +349,18 @@ export function DocumentsTable() {
                     </Button>
                   </div>
                 )}
+                {getDocumentFile(selected) && (
+                  <Button
+                    variant="secondary"
+                    className="w-full justify-center"
+                    onClick={() => downloadDocument(selected)}
+                  >
+                    <Download data-icon="inline-start" />
+                    Download document
+                  </Button>
+                )}
                 <Button
-                  variant="secondary"
+                  variant="outline"
                   render={<Link href={`/admin/applications/${selected.appId}`} />}
                   className="w-full justify-center"
                 >

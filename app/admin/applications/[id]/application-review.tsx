@@ -46,7 +46,16 @@ import { Field, FieldLabel } from "@/components/ui/field"
 import { AppStatusBadge, DepositStatusBadge } from "@/components/admin/status-badge"
 import { CaseHealthCard } from "@/components/case-health-card"
 import { DetailField } from "@/components/admin/detail-field"
-import { formatCurrencyTZS, statusLabels, type Application, type AppStatus } from "@/lib/admin-data"
+import {
+  buildDocumentFileName,
+  formatCurrencyTZS,
+  getDocumentFile,
+  statusLabels,
+  type Application,
+  type AppStatus,
+  type Document,
+} from "@/lib/admin-data"
+import { downloadFile } from "@/lib/download"
 import { cn } from "@/lib/utils"
 
 function buildCopyAllDetails(app: Application) {
@@ -83,6 +92,19 @@ export function ApplicationReview({ application }: { application: Application })
   const updateDocumentStatus = (nextStatus: "verified" | "rejected") => {
     if (!activeDoc) return
     setDocumentStatuses((current) => ({ ...current, [activeDoc.id]: nextStatus }))
+  }
+
+  const handleDownloadDocument = (doc?: Document) => {
+    if (!doc) return
+    const file = getDocumentFile(doc)
+    if (!file) return
+    const filename = buildDocumentFileName({
+      agentName: application.agentName,
+      docName: doc.name,
+      network: application.channel,
+      extension: file.extension,
+    })
+    void downloadFile(file.url, filename)
   }
 
   const handleCopyAll = async () => {
@@ -268,7 +290,12 @@ export function ApplicationReview({ application }: { application: Application })
 
               <div className="flex flex-col gap-4 p-5">
                 <div className="flex items-center justify-end">
-                  <Button variant="outline" size="sm" disabled={activeDoc?.status === "missing"}>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={!getDocumentFile(activeDoc ?? ({} as Document))}
+                    onClick={() => handleDownloadDocument(activeDoc)}
+                  >
                     <Download data-icon="inline-start" />
                     Download
                   </Button>

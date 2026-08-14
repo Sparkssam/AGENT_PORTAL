@@ -131,6 +131,8 @@ const documentSet = (overrides?: Partial<Record<string, DocOverride>>): Document
       status: "missing",
       fileType: "image",
       previewUrl: "/documents/shop-sample.png",
+      fileUrl: "/documents/shop-sample.png",
+      fileExtension: "png",
     },
     {
       id: "doc-7",
@@ -140,8 +142,10 @@ const documentSet = (overrides?: Partial<Record<string, DocOverride>>): Document
       verifiedBy: "System OCR",
       fileType: "image",
       previewUrl: "/documents/portrait-sample.png",
+      fileUrl: "/documents/portrait-sample.png",
+      fileExtension: "png",
     },
-    { id: "doc-8", name: "Other", type: "other", status: "verified", verifiedBy: "Sarah Admin", fileType: "pdf" },
+    { id: "doc-8", name: "Other", type: "other", status: "verified", verifiedBy: "Sarah Admin", fileType: "pdf", fileUrl: "/documents/id-front-sample.png", fileExtension: "png" },
   ]
   if (!overrides) return base
   return base.map((d) => {
@@ -566,6 +570,42 @@ export function formatCurrencyTZS(amount: number) {
 
 export function getApplicationById(id: string) {
   return applications.find((a) => a.id === id)
+}
+
+/**
+ * Collapses an arbitrary label into a safe filename token (alphanumerics only),
+ * e.g. "John Doe Enterprise" -> "JohnDoeEnterprise", "M-Pesa" -> "MPesa".
+ */
+export function sanitizeFileToken(value: string) {
+  return value.trim().replace(/[^a-zA-Z0-9]+/g, "")
+}
+
+/**
+ * Builds the standardized download filename in the Name_Doc_Network format,
+ * e.g. "JohnDoeEnterprise_IDCardFront_SubAgent.png".
+ */
+export function buildDocumentFileName(opts: {
+  agentName: string
+  docName: string
+  network: string
+  extension?: string
+}) {
+  const name = sanitizeFileToken(opts.agentName) || "Agent"
+  const doc = sanitizeFileToken(opts.docName) || "Document"
+  const network = sanitizeFileToken(opts.network) || "Network"
+  const ext = (opts.extension ?? "png").replace(/^\.+/, "").toLowerCase()
+  return `${name}_${doc}_${network}.${ext}`
+}
+
+/**
+ * Resolves the downloadable source for a document. Returns null when there is
+ * nothing to download (e.g. the document is still missing).
+ */
+export function getDocumentFile(doc: Document) {
+  const url = doc.fileUrl ?? doc.previewUrl
+  if (!url || doc.status === "missing") return null
+  const extension = doc.fileExtension ?? url.split(".").pop()?.split("?")[0] ?? "png"
+  return { url, extension }
 }
 
 export type HealthTone = "healthy" | "attention" | "critical" | "neutral"

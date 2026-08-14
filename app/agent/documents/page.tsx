@@ -22,7 +22,11 @@ export default function DocumentsPage() {
         </div>
       </div>
 
-      <DocumentsManager documents={currentApplication.documents} />
+      <DocumentsManager
+        documents={currentApplication.documents}
+        agentName={currentApplication.agentName}
+        network={currentApplication.channel}
+      />
     </div>
   )
 }

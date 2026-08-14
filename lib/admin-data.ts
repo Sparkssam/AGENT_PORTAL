@@ -41,6 +41,8 @@ export interface Document {
   verifiedBy?: string
   fileType: "image" | "pdf"
   previewUrl?: string
+  fileUrl?: string
+  fileExtension?: string
   /** Reviewer note explaining why a document was rejected / needs re-upload. */
   reason?: string
 }
@@ -105,6 +107,8 @@ const documentSet = (overrides?: Partial<Record<string, DocOverride>>): Document
       verifiedBy: "System OCR",
       fileType: "image",
       previewUrl: "/documents/id-front-sample.png",
+      fileUrl: "/documents/id-front-sample.png",
+      fileExtension: "png",
     },
     {
       id: "doc-2",
@@ -114,10 +118,12 @@ const documentSet = (overrides?: Partial<Record<string, DocOverride>>): Document
       verifiedBy: "System OCR",
       fileType: "image",
       previewUrl: "/documents/id-front-sample.png",
+      fileUrl: "/documents/id-front-sample.png",
+      fileExtension: "png",
     },
-    { id: "doc-3", name: "TIN Document", type: "tin", status: "unverified", fileType: "pdf" },
-    { id: "doc-4", name: "Agreement Contract", type: "contract", status: "verified", verifiedBy: "Sarah Admin", fileType: "pdf" },
-    { id: "doc-5", name: "Business Licence", type: "licence", status: "verified", verifiedBy: "Sarah Admin", fileType: "pdf" },
+    { id: "doc-3", name: "TIN Document", type: "tin", status: "unverified", fileType: "pdf", fileUrl: "/documents/id-front-sample.png", fileExtension: "png" },
+    { id: "doc-4", name: "Agreement Contract", type: "contract", status: "verified", verifiedBy: "Sarah Admin", fileType: "pdf", fileUrl: "/documents/id-front-sample.png", fileExtension: "png" },
+    { id: "doc-5", name: "Business Licence", type: "licence", status: "verified", verifiedBy: "Sarah Admin", fileType: "pdf", fileUrl: "/documents/id-front-sample.png", fileExtension: "png" },
     {
       id: "doc-6",
       name: "Shop Image",

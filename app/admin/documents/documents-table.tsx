@@ -298,12 +298,27 @@ export function DocumentsTable() {
                   </div>
                 )}
               </div>
-              <SheetFooter>
+              <SheetFooter className="gap-2">
+                {selected.status !== "missing" && (
+                  <div className="grid w-full grid-cols-2 gap-2">
+                    <Button
+                      variant="outline"
+                      className="text-destructive hover:text-destructive"
+                      onClick={() => setSelected({ ...selected, status: "rejected", reason: "Marked for correction during review" })}
+                    >
+                      Reject
+                    </Button>
+                    <Button onClick={() => setSelected({ ...selected, status: "verified", verifiedBy: "Admin User" })}>
+                      Verify document
+                    </Button>
+                  </div>
+                )}
                 <Button
+                  variant="secondary"
                   render={<Link href={`/admin/applications/${selected.appId}`} />}
                   className="w-full justify-center"
                 >
-                  View application
+                  Open full case
                 </Button>
                 <SheetClose render={<Button variant="outline" className="w-full justify-center" />}>
                   Close

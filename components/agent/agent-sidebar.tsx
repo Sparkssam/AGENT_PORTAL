@@ -34,7 +34,7 @@ export function AgentSidebar() {
   const unread = unreadNotificationCount()
 
   return (
-    <aside className="hidden w-64 shrink-0 flex-col bg-sidebar text-sidebar-foreground md:flex">
+    <aside className="hidden w-64 shrink-0 flex-col border-r border-sidebar-border bg-sidebar text-sidebar-foreground md:flex lg:w-72">
       <div className="flex items-center gap-2 px-6 py-6">
         <span className="flex size-8 items-center justify-center rounded-md bg-sidebar-primary text-sidebar-primary-foreground">
           <Zap className="size-4" fill="currentColor" />

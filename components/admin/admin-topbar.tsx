@@ -74,25 +74,28 @@ export function AdminTopbar() {
             }
           >
             <div className="hidden text-right sm:block">
-              <p className="text-sm font-medium leading-tight text-foreground">Admin User</p>
-              <p className="text-xs leading-tight text-muted-foreground">Super Administrator</p>
+              <p className="text-sm font-semibold leading-tight text-foreground">{name}</p>
+              <p className="text-xs leading-tight text-muted-foreground">{title}</p>
             </div>
             <Avatar className="size-9">
-              <AvatarFallback className="bg-primary text-primary-foreground">AU</AvatarFallback>
+              <AvatarFallback className="bg-primary text-primary-foreground">{initials}</AvatarFallback>
             </Avatar>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-56">
             <DropdownMenuGroup>
               <DropdownMenuLabel>
-                <p className="text-sm font-medium">Admin User</p>
-                <p className="text-xs text-muted-foreground">admin@kinetic.co.tz</p>
+                <p className="text-sm font-medium">{name}</p>
+                <p className="text-xs text-muted-foreground">{email}</p>
               </DropdownMenuLabel>
             </DropdownMenuGroup>
             <DropdownMenuSeparator />
             <DropdownMenuGroup>
               <DropdownMenuItem>Profile settings</DropdownMenuItem>
               <DropdownMenuItem>Switch region</DropdownMenuItem>
-              <DropdownMenuItem>Log out</DropdownMenuItem>
+              <DropdownMenuItem onClick={handleLogout} className="text-destructive focus:text-destructive">
+                <LogOut data-icon="inline-start" />
+                Log out
+              </DropdownMenuItem>
             </DropdownMenuGroup>
           </DropdownMenuContent>
         </DropdownMenu>

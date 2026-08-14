@@ -44,6 +44,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogT
 import { Textarea } from "@/components/ui/textarea"
 import { Field, FieldLabel } from "@/components/ui/field"
 import { AppStatusBadge, DepositStatusBadge } from "@/components/admin/status-badge"
+import { CaseHealthCard } from "@/components/case-health-card"
 import { DetailField } from "@/components/admin/detail-field"
 import { formatCurrencyTZS, statusLabels, type Application, type AppStatus } from "@/lib/admin-data"
 import { cn } from "@/lib/utils"
@@ -74,8 +75,15 @@ export function ApplicationReview({ application }: { application: Application })
   const [status, setStatus] = useState<AppStatus>(application.status)
   const [copiedAll, setCopiedAll] = useState(false)
   const [correctionNote, setCorrectionNote] = useState("")
+  const [documentStatuses, setDocumentStatuses] = useState<Record<string, "verified" | "rejected">>({})
 
   const activeDoc = application.documents.find((d) => d.id === activeDocId) ?? application.documents[0]
+  const activeDocStatus = activeDoc ? documentStatuses[activeDoc.id] ?? activeDoc.status : "missing"
+
+  const updateDocumentStatus = (nextStatus: "verified" | "rejected") => {
+    if (!activeDoc) return
+    setDocumentStatuses((current) => ({ ...current, [activeDoc.id]: nextStatus }))
+  }
 
   const handleCopyAll = async () => {
     try {
@@ -133,6 +141,8 @@ export function ApplicationReview({ application }: { application: Application })
           </div>
         </div>
       </div>
+
+      <CaseHealthCard application={application} showNextAction={false} />
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_320px]">
         <div className="flex flex-col gap-6">
@@ -284,11 +294,34 @@ export function ApplicationReview({ application }: { application: Application })
                     </div>
                   )}
                 </div>
-                <div className="text-center">
-                  <p className="text-sm font-medium text-foreground">{activeDoc?.name}</p>
-                  <p className="text-xs text-muted-foreground">
-                    {activeDoc?.verifiedBy ? `Verified by ${activeDoc.verifiedBy}` : "Awaiting verification"}
-                  </p>
+                <div className="flex flex-col gap-3 rounded-lg border border-border bg-secondary/30 p-4 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <p className="text-sm font-semibold text-foreground">{activeDoc?.name}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {activeDocStatus === "verified"
+                        ? `Verified${activeDoc?.verifiedBy ? ` by ${activeDoc.verifiedBy}` : " in this review"}`
+                        : activeDocStatus === "rejected"
+                          ? activeDoc?.reason ?? "Marked for correction in this review"
+                          : "Awaiting document review"}
+                    </p>
+                  </div>
+                  {activeDocStatus !== "missing" && (
+                    <div className="flex gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => updateDocumentStatus("rejected")}
+                        className="text-destructive hover:text-destructive"
+                      >
+                        <XCircle data-icon="inline-start" />
+                        Reject
+                      </Button>
+                      <Button size="sm" onClick={() => updateDocumentStatus("verified")}>
+                        <CheckCircle2 data-icon="inline-start" />
+                        Verify
+                      </Button>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>

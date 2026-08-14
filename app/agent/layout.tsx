@@ -6,7 +6,7 @@ import { AuthGuard } from "@/components/auth/auth-guard"
 export default function AgentLayout({ children }: { children: React.ReactNode }) {
   return (
     <AuthGuard role="agent">
-      <div className="flex h-screen overflow-hidden bg-background">
+      <div className="flex min-h-screen overflow-hidden bg-secondary/30">
         <AgentSidebar />
         <div className="flex min-w-0 flex-1 flex-col">
           <AgentTopbar />

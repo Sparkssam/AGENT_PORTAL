@@ -5,7 +5,6 @@ import {
   FileText,
   FolderOpen,
   Headset,
-  Loader,
   UserRound,
   Wallet,
   CheckCircle2,
@@ -13,8 +12,8 @@ import {
   Upload,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { AppStatusBadge, DepositStatusBadge } from "@/components/admin/status-badge"
-import { formatCurrencyTZS } from "@/lib/admin-data"
+import { AppStatusBadge } from "@/components/admin/status-badge"
+import { CaseHealthCard } from "@/components/case-health-card"
 import { currentAgent, currentApplication, documentChecklistProgress, recentAgentActivity } from "@/lib/agent-data"
 
 const quickLinks = [
@@ -69,29 +68,7 @@ export default function AgentDashboardPage() {
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
         <div className="flex flex-col gap-6 lg:col-span-2">
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <div className="flex flex-col gap-3 rounded-lg border border-border bg-card p-5">
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-muted-foreground">Application Status</span>
-                <Loader className="size-4 text-muted-foreground/60" />
-              </div>
-              <AppStatusBadge status={currentApplication.status} className="w-fit" />
-              <p className="text-sm text-muted-foreground">
-                Your application {currentApplication.appNumber} is currently under review by our agents.
-              </p>
-            </div>
-
-            <div className="flex flex-col gap-3 rounded-lg border border-border bg-card p-5">
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-muted-foreground">Deposit Status</span>
-                <Wallet className="size-4 text-muted-foreground/60" />
-              </div>
-              <DepositStatusBadge status={currentApplication.depositStatus} className="w-fit" />
-              <p className="text-sm text-muted-foreground">
-                Deposit of {formatCurrencyTZS(currentApplication.depositAmount)} received and cleared.
-              </p>
-            </div>
-          </div>
+          <CaseHealthCard application={currentApplication} />
 
           <div className="rounded-lg border border-border bg-card">
             <div className="flex items-center justify-between border-b border-border px-5 py-4">

@@ -1,8 +1,10 @@
 import Link from "next/link"
 import { notFound } from "next/navigation"
-import { ArrowLeft, CheckCircle2, Circle, Download, Eye, MapPin } from "lucide-react"
+import { ArrowLeft, CheckCircle2, Download, MapPin } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { AppStatusBadge, DepositStatusBadge } from "@/components/admin/status-badge"
+import { CaseHealthCard } from "@/components/case-health-card"
+import { CorrectionChecklist } from "@/components/correction-checklist"
 import { formatCurrencyTZS, type AppStatus } from "@/lib/admin-data"
 import { currentApplication } from "@/lib/agent-data"
 
@@ -54,6 +56,8 @@ export default async function ApplicationDetailPage({ params }: { params: Promis
           </Button>
         </div>
       </div>
+
+      <CaseHealthCard application={application} />
 
       {!isRejectedOrCorrection && (
         <div className="rounded-lg border border-border bg-card p-5">
@@ -123,42 +127,7 @@ export default async function ApplicationDetailPage({ params }: { params: Promis
             </div>
           </div>
 
-          <div className="rounded-lg border border-border bg-card">
-            <div className="border-b border-border px-5 py-4">
-              <h2 className="text-base font-semibold text-foreground">Documents</h2>
-            </div>
-            <ul className="divide-y divide-border px-5">
-              {application.documents.map((doc) => (
-                <li key={doc.id} className="flex items-center gap-3 py-3.5">
-                  {doc.status === "missing" ? (
-                    <Circle className="size-4 shrink-0 text-muted-foreground/50" />
-                  ) : (
-                    <CheckCircle2 className="size-4 shrink-0 text-success" />
-                  )}
-                  <span className="text-sm text-foreground">{doc.name}</span>
-                  <span className="ml-auto flex items-center gap-3">
-                    <span
-                      className={`text-xs font-medium ${
-                        doc.status === "verified"
-                          ? "text-success"
-                          : doc.status === "unverified"
-                            ? "text-warning-foreground"
-                            : "text-destructive"
-                      }`}
-                    >
-                      {doc.status === "verified" ? "Verified" : doc.status === "unverified" ? "Unverified" : "Missing"}
-                    </span>
-                    {doc.previewUrl && (
-                      <Button variant="ghost" size="icon-sm" aria-label={`Preview ${doc.name}`}>
-                        <Eye className="size-3.5" />
-                      </Button>
-                    )}
-                  </span>
-                </li>
-              ))}
-            </ul>
-            <div className="p-4" />
-          </div>
+          <CorrectionChecklist documents={application.documents} fixHref="/agent/documents" />
         </div>
 
         <div className="flex flex-col gap-6">

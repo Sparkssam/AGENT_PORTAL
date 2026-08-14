@@ -13,7 +13,7 @@ export type AppStatus =
 
 export type DepositStatus = "PENDING" | "SUBMITTED" | "CLEARED" | "REJECTED" | "AWAITING_PROOF"
 
-export type DocumentStatus = "verified" | "unverified" | "missing"
+export type DocumentStatus = "verified" | "unverified" | "missing" | "rejected"
 
 export const statusLabels: Record<AppStatus, string> = {
   DRAFT: "Draft",
@@ -41,6 +41,8 @@ export interface Document {
   verifiedBy?: string
   fileType: "image" | "pdf"
   previewUrl?: string
+  /** Reviewer note explaining why a document was rejected / needs re-upload. */
+  reason?: string
 }
 
 export interface TimelineEvent {
@@ -91,7 +93,9 @@ export interface Application {
   fieldsTotal: number
 }
 
-const documentSet = (overrides?: Partial<Record<string, DocumentStatus>>): Document[] => {
+type DocOverride = DocumentStatus | { status: DocumentStatus; reason?: string }
+
+const documentSet = (overrides?: Partial<Record<string, DocOverride>>): Document[] => {
   const base: Document[] = [
     {
       id: "doc-1",
@@ -134,7 +138,12 @@ const documentSet = (overrides?: Partial<Record<string, DocumentStatus>>): Docum
     { id: "doc-8", name: "Other", type: "other", status: "verified", verifiedBy: "Sarah Admin", fileType: "pdf" },
   ]
   if (!overrides) return base
-  return base.map((d) => (overrides[d.type] ? { ...d, status: overrides[d.type]! } : d))
+  return base.map((d) => {
+    const o = overrides[d.type]
+    if (!o) return d
+    if (typeof o === "string") return { ...d, status: o }
+    return { ...d, status: o.status, reason: o.reason ?? d.reason }
+  })
 }
 
 export const applications: Application[] = [
@@ -371,10 +380,16 @@ export const applications: Application[] = [
     lng: 39.098,
     submittedAt: "2024-04-24T10:00:00",
     daysPending: 14,
-    documents: documentSet({ tin: "missing" }),
+    documents: documentSet({
+      tin: { status: "missing" },
+      id_back: { status: "rejected", reason: "Image is unclear — re-upload a sharp, well-lit photo of the ID back." },
+    }),
     fieldsComplete: 10,
     fieldsTotal: 12,
-    timeline: [{ id: "t1", actor: "System", action: "Flagged: Docs Missing", timestamp: "14 days ago" }],
+    timeline: [
+      { id: "t2", actor: "Sarah Admin", action: "Requested correction", detail: "ID Card Back unclear; TIN document missing", timestamp: "13 days ago" },
+      { id: "t1", actor: "System", action: "Flagged: Docs Missing", timestamp: "14 days ago" },
+    ],
   },
   {
     id: "app-8841",
@@ -408,10 +423,13 @@ export const applications: Application[] = [
     lng: 39.1988,
     submittedAt: "2024-04-26T13:20:00",
     daysPending: 12,
-    documents: documentSet({ tin: "unverified" }),
+    documents: documentSet({ tin: { status: "rejected", reason: "TIN number does not match NIDA records — verify and re-submit." } }),
     fieldsComplete: 11,
     fieldsTotal: 12,
-    timeline: [{ id: "t1", actor: "System", action: "Flagged: Signature Invalid", timestamp: "12 days ago" }],
+    timeline: [
+      { id: "t2", actor: "Michael Manager", action: "Requested correction", detail: "TIN number mismatch", timestamp: "12 days ago" },
+      { id: "t1", actor: "System", action: "Flagged: Signature Invalid", timestamp: "12 days ago" },
+    ],
   },
   {
     id: "app-8862",
@@ -445,10 +463,13 @@ export const applications: Application[] = [
     lng: 36.6822,
     submittedAt: "2024-04-28T09:40:00",
     daysPending: 9,
-    documents: documentSet({ id_front: "unverified" }),
+    documents: documentSet({ id_front: { status: "rejected", reason: "ID has expired. Upload a valid, unexpired National ID." } }),
     fieldsComplete: 9,
     fieldsTotal: 12,
-    timeline: [{ id: "t1", actor: "System", action: "Flagged: ID Expired", timestamp: "9 days ago" }],
+    timeline: [
+      { id: "t2", actor: "Sarah Admin", action: "Requested correction", detail: "National ID expired", timestamp: "9 days ago" },
+      { id: "t1", actor: "System", action: "Flagged: ID Expired", timestamp: "9 days ago" },
+    ],
   },
 ]
 
@@ -539,6 +560,81 @@ export function formatCurrencyTZS(amount: number) {
 
 export function getApplicationById(id: string) {
   return applications.find((a) => a.id === id)
+}
+
+export type HealthTone = "healthy" | "attention" | "critical" | "neutral"
+
+export interface CaseHealth {
+  /** Percentage of required application fields completed. */
+  appPercent: number
+  fieldsComplete: number
+  fieldsTotal: number
+  docsVerified: number
+  docsTotal: number
+  docsPending: number
+  docsRejected: number
+  docsMissing: number
+  /** Documents the agent must act on (rejected + missing). */
+  corrections: number
+  depositCleared: boolean
+  /** Overall traffic-light state for the case. */
+  tone: HealthTone
+  /** The single most important thing to do next, agent-facing. */
+  nextAction: { label: string; href: string }
+}
+
+/**
+ * Derives a single "case file" health summary from an application so both the
+ * agent and admin views can answer: Where am I? What's missing? What's next?
+ */
+export function computeCaseHealth(app: Application): CaseHealth {
+  const docsTotal = app.documents.length
+  const docsVerified = app.documents.filter((d) => d.status === "verified").length
+  const docsPending = app.documents.filter((d) => d.status === "unverified").length
+  const docsRejected = app.documents.filter((d) => d.status === "rejected").length
+  const docsMissing = app.documents.filter((d) => d.status === "missing").length
+  const corrections = docsRejected + docsMissing
+  const appPercent = app.fieldsTotal === 0 ? 0 : Math.round((app.fieldsComplete / app.fieldsTotal) * 100)
+  const depositCleared = app.depositStatus === "CLEARED"
+
+  let tone: HealthTone = "neutral"
+  if (app.status === "REJECTED") tone = "critical"
+  else if (app.status === "COMPLETED") tone = "healthy"
+  else if (app.status === "NEEDS_CORRECTION" || corrections > 0 || app.depositStatus === "REJECTED") tone = "attention"
+  else if (docsVerified === docsTotal && appPercent === 100 && depositCleared) tone = "healthy"
+  else tone = "neutral"
+
+  const problemDoc = app.documents.find((d) => d.status === "rejected") ?? app.documents.find((d) => d.status === "missing")
+
+  let nextAction: { label: string; href: string }
+  if (app.status === "REJECTED") {
+    nextAction = { label: "Contact support", href: "/agent/dashboard" }
+  } else if (app.status === "COMPLETED") {
+    nextAction = { label: "View approval summary", href: `/agent/applications/${app.id}` }
+  } else if (problemDoc) {
+    nextAction = { label: `Fix ${problemDoc.name}`, href: "/agent/documents" }
+  } else if (!depositCleared) {
+    nextAction = { label: "Complete your deposit", href: `/agent/applications/${app.id}` }
+  } else if (appPercent < 100) {
+    nextAction = { label: "Complete your application", href: `/agent/applications/${app.id}` }
+  } else {
+    nextAction = { label: "Track review status", href: `/agent/applications/${app.id}` }
+  }
+
+  return {
+    appPercent,
+    fieldsComplete: app.fieldsComplete,
+    fieldsTotal: app.fieldsTotal,
+    docsVerified,
+    docsTotal,
+    docsPending,
+    docsRejected,
+    docsMissing,
+    corrections,
+    depositCleared,
+    tone,
+    nextAction,
+  }
 }
 
 export type AuditCategory = "Application" | "Document" | "Agent" | "System" | "Security"

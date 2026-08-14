@@ -50,11 +50,13 @@ function DocStatusBadge({ status }: { status: DocumentStatus }) {
   const styles: Record<DocumentStatus, string> = {
     verified: "bg-[var(--color-success)]/10 text-[var(--color-success)]",
     unverified: "bg-[var(--color-warning)]/10 text-[var(--color-warning)]",
-    missing: "bg-destructive/10 text-destructive",
+    rejected: "bg-destructive/10 text-destructive",
+    missing: "bg-muted text-muted-foreground",
   }
   const labels: Record<DocumentStatus, string> = {
     verified: "Verified",
-    unverified: "Unverified",
+    unverified: "Pending",
+    rejected: "Rejected",
     missing: "Missing",
   }
   return <Badge className={cn("border-0 font-medium", styles[status])}>{labels[status]}</Badge>
@@ -91,23 +93,25 @@ export function DocumentsTable() {
     return {
       total: allDocuments.length,
       verified: allDocuments.filter((d) => d.status === "verified").length,
-      unverified: allDocuments.filter((d) => d.status === "unverified").length,
+      pending: allDocuments.filter((d) => d.status === "unverified").length,
+      rejected: allDocuments.filter((d) => d.status === "rejected").length,
       missing: allDocuments.filter((d) => d.status === "missing").length,
     }
   }, [])
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-5">
         {[
-          { label: "Total documents", value: summary.total },
-          { label: "Verified", value: summary.verified },
-          { label: "Unverified", value: summary.unverified },
-          { label: "Missing", value: summary.missing },
+          { label: "Total documents", value: summary.total, cls: "text-foreground" },
+          { label: "Verified", value: summary.verified, cls: "text-success" },
+          { label: "Pending", value: summary.pending, cls: "text-warning-foreground" },
+          { label: "Rejected", value: summary.rejected, cls: "text-destructive" },
+          { label: "Missing", value: summary.missing, cls: "text-muted-foreground" },
         ].map((s) => (
           <div key={s.label} className="rounded-lg border border-border bg-card p-4">
             <p className="text-xs text-muted-foreground">{s.label}</p>
-            <p className="mt-1 font-mono text-xl font-semibold text-foreground">{s.value.toLocaleString("en-US")}</p>
+            <p className={cn("mt-1 font-mono text-xl font-semibold", s.cls)}>{s.value.toLocaleString("en-US")}</p>
           </div>
         ))}
       </div>
@@ -139,7 +143,8 @@ export function DocumentsTable() {
             <SelectGroup>
               <SelectItem value="all">All statuses</SelectItem>
               <SelectItem value="verified">Verified</SelectItem>
-              <SelectItem value="unverified">Unverified</SelectItem>
+              <SelectItem value="unverified">Pending</SelectItem>
+              <SelectItem value="rejected">Rejected</SelectItem>
               <SelectItem value="missing">Missing</SelectItem>
             </SelectGroup>
           </SelectContent>
@@ -286,6 +291,12 @@ export function DocumentsTable() {
                     <p className="mt-1 text-foreground">{documentTypeLabels[selected.type] ?? selected.type}</p>
                   </div>
                 </div>
+                {selected.status === "rejected" && selected.reason && (
+                  <div className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2">
+                    <p className="text-xs font-medium text-destructive">Rejection reason</p>
+                    <p className="mt-0.5 text-sm text-destructive/90">{selected.reason}</p>
+                  </div>
+                )}
               </div>
               <SheetFooter>
                 <Button

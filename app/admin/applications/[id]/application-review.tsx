@@ -13,6 +13,12 @@ import {
   FileText,
   MapPin,
   ImageOff,
+  CheckCircle2,
+  XCircle,
+  AlertTriangle,
+  ClipboardList,
+  FileCheck2,
+  Wallet,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {

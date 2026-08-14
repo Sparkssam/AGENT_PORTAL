@@ -57,18 +57,18 @@ export default function LoginPage() {
 
   return (
     <AuthShell
-      title="Welcome back"
-      description="Sign in to manage your agency, applications, and documents."
+      title="Good to see you again"
+      description="Pick up right where you left off — your agency, applications, and documents await."
       footer={
         <>
-          New to the Agent Portal?{" "}
+          First time here?{" "}
           <Link href="/register" className="font-medium text-foreground hover:underline">
-            Create an account
+            Start your journey
           </Link>
         </>
       }
     >
-      <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+      <form onSubmit={handleSubmit} className="flex flex-col gap-3">
         <div className="flex flex-col gap-1.5">
           <Label htmlFor="email">Email or phone number</Label>
           <Input
@@ -140,12 +140,11 @@ export default function LoginPage() {
         </Button>
       </form>
 
-      <div className="mt-6 rounded-xl border border-dashed border-border p-4">
-        <p className="text-xs font-medium tracking-wider text-muted-foreground uppercase">Try the demo</p>
-        <p className="mt-1 text-xs text-muted-foreground">
-          Jump straight in as either role — no real account needed.
+      <div className="mt-4 rounded-xl border border-dashed border-border p-3">
+        <p className="text-xs font-medium tracking-wider text-muted-foreground uppercase">
+          Take it for a spin — no sign-up
         </p>
-        <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
+        <div className="mt-2.5 grid grid-cols-1 gap-2 sm:grid-cols-2">
           <DemoAccountCard
             icon={ShieldCheck}
             label="Continue as Admin"

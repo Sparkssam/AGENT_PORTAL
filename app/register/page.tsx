@@ -46,18 +46,18 @@ export default function RegisterPage() {
 
   return (
     <AuthShell
-      title="Create your account"
-      description="Start your application to become an authorized Kinetic agent."
+      title="Become a Kinetic agent"
+      description="A few details is all it takes to kick off your agent application."
       footer={
         <>
-          Already have an account?{" "}
+          Already one of us?{" "}
           <Link href="/login" className="font-medium text-foreground hover:underline">
-            Log in
+            Sign in
           </Link>
         </>
       }
     >
-      <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+      <form onSubmit={handleSubmit} className="flex flex-col gap-3">
         <div className="flex flex-col gap-1.5">
           <Label htmlFor="fullName">Full name</Label>
           <Input

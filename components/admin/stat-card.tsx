@@ -1,0 +1,34 @@
+import type { LucideIcon } from "lucide-react"
+import { cn } from "@/lib/utils"
+
+interface StatCardProps {
+  label: string
+  value: string | number
+  icon: LucideIcon
+  tone?: "default" | "warning" | "success" | "destructive" | "accent"
+}
+
+const toneDot: Record<Required<StatCardProps>["tone"], string> = {
+  default: "bg-foreground",
+  warning: "bg-warning",
+  success: "bg-success",
+  destructive: "bg-destructive",
+  accent: "bg-accent",
+}
+
+export function StatCard({ label, value, icon: Icon, tone = "default" }: StatCardProps) {
+  return (
+    <div className="flex flex-col gap-3 rounded-lg border border-border bg-card p-5">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <span className={cn("size-1.5 rounded-full", toneDot[tone])} />
+          <span className="text-sm text-muted-foreground">{label}</span>
+        </div>
+        <Icon className="size-4 text-muted-foreground/60" />
+      </div>
+      <p className="font-mono text-3xl font-semibold tracking-tight text-foreground">
+        {typeof value === "number" ? value.toLocaleString("en-US") : value}
+      </p>
+    </div>
+  )
+}

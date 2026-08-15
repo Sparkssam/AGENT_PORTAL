@@ -51,12 +51,14 @@ export function DepositStatusBadge({ status, className }: { status: DepositStatu
 const documentStatusStyles: Record<DocumentStatus, string> = {
   verified: "text-success",
   unverified: "text-warning-foreground",
-  missing: "text-destructive",
+  rejected: "text-destructive",
+  missing: "text-muted-foreground",
 }
 
 const documentStatusLabels: Record<DocumentStatus, string> = {
   verified: "Verified",
-  unverified: "Unverified",
+  unverified: "Pending",
+  rejected: "Rejected",
   missing: "Missing",
 }
 

@@ -1,7 +1,8 @@
 "use client"
 
 import { useState } from "react"
-import { Bell, Search, Menu, X } from "lucide-react"
+import { useRouter } from "next/navigation"
+import { Bell, LogOut, Search, Menu, X } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import {
@@ -15,9 +16,22 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { Button } from "@/components/ui/button"
 import { AdminMobileNav } from "@/components/admin/admin-mobile-nav"
+import { useAuth } from "@/lib/auth-context"
 
 export function AdminTopbar() {
   const [mobileNavOpen, setMobileNavOpen] = useState(false)
+  const { user, logout } = useAuth()
+  const router = useRouter()
+
+  const name = user?.name ?? "Admin User"
+  const title = user?.title ?? "Super Administrator"
+  const email = user?.email ?? "admin@kinetic.co.tz"
+  const initials = user?.initials ?? "AU"
+
+  function handleLogout() {
+    logout()
+    router.push("/login")
+  }
 
   return (
     <header className="flex h-16 items-center gap-4 border-b border-border bg-background px-4 md:px-6">
@@ -60,25 +74,28 @@ export function AdminTopbar() {
             }
           >
             <div className="hidden text-right sm:block">
-              <p className="text-sm font-medium leading-tight text-foreground">Admin User</p>
-              <p className="text-xs leading-tight text-muted-foreground">Super Administrator</p>
+              <p className="text-sm font-semibold leading-tight text-foreground">{name}</p>
+              <p className="text-xs leading-tight text-muted-foreground">{title}</p>
             </div>
             <Avatar className="size-9">
-              <AvatarFallback className="bg-primary text-primary-foreground">AU</AvatarFallback>
+              <AvatarFallback className="bg-primary text-primary-foreground">{initials}</AvatarFallback>
             </Avatar>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-56">
             <DropdownMenuGroup>
               <DropdownMenuLabel>
-                <p className="text-sm font-medium">Admin User</p>
-                <p className="text-xs text-muted-foreground">admin@kinetic.co.tz</p>
+                <p className="text-sm font-medium">{name}</p>
+                <p className="text-xs text-muted-foreground">{email}</p>
               </DropdownMenuLabel>
             </DropdownMenuGroup>
             <DropdownMenuSeparator />
             <DropdownMenuGroup>
               <DropdownMenuItem>Profile settings</DropdownMenuItem>
               <DropdownMenuItem>Switch region</DropdownMenuItem>
-              <DropdownMenuItem>Log out</DropdownMenuItem>
+              <DropdownMenuItem onClick={handleLogout} className="text-destructive focus:text-destructive">
+                <LogOut data-icon="inline-start" />
+                Log out
+              </DropdownMenuItem>
             </DropdownMenuGroup>
           </DropdownMenuContent>
         </DropdownMenu>

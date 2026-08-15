@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react"
 import Image from "next/image"
 import Link from "next/link"
-import { FileText, ImageOff, Search } from "lucide-react"
+import { Download, FileText, ImageOff, Search } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Badge } from "@/components/ui/badge"
@@ -17,13 +17,21 @@ import {
   SheetFooter,
   SheetClose,
 } from "@/components/ui/sheet"
-import { applications, type Document, type DocumentStatus } from "@/lib/admin-data"
+import {
+  applications,
+  buildDocumentFileName,
+  getDocumentFile,
+  type Document,
+  type DocumentStatus,
+} from "@/lib/admin-data"
+import { downloadFile } from "@/lib/download"
 import { cn } from "@/lib/utils"
 
 interface FlatDocument extends Document {
   appId: string
   appNumber: string
   agentName: string
+  channel: string
 }
 
 const allDocuments: FlatDocument[] = applications.flatMap((app) =>
@@ -32,8 +40,21 @@ const allDocuments: FlatDocument[] = applications.flatMap((app) =>
     appId: app.id,
     appNumber: app.appNumber,
     agentName: app.agentName,
+    channel: app.channel,
   })),
 )
+
+function downloadDocument(doc: FlatDocument) {
+  const file = getDocumentFile(doc)
+  if (!file) return
+  const filename = buildDocumentFileName({
+    agentName: doc.agentName,
+    docName: doc.name,
+    network: doc.channel,
+    extension: file.extension,
+  })
+  void downloadFile(file.url, filename)
+}
 
 const documentTypeLabels: Record<string, string> = {
   id_front: "ID Card Front",
@@ -50,11 +71,13 @@ function DocStatusBadge({ status }: { status: DocumentStatus }) {
   const styles: Record<DocumentStatus, string> = {
     verified: "bg-[var(--color-success)]/10 text-[var(--color-success)]",
     unverified: "bg-[var(--color-warning)]/10 text-[var(--color-warning)]",
-    missing: "bg-destructive/10 text-destructive",
+    rejected: "bg-destructive/10 text-destructive",
+    missing: "bg-muted text-muted-foreground",
   }
   const labels: Record<DocumentStatus, string> = {
     verified: "Verified",
-    unverified: "Unverified",
+    unverified: "Pending",
+    rejected: "Rejected",
     missing: "Missing",
   }
   return <Badge className={cn("border-0 font-medium", styles[status])}>{labels[status]}</Badge>
@@ -91,23 +114,25 @@ export function DocumentsTable() {
     return {
       total: allDocuments.length,
       verified: allDocuments.filter((d) => d.status === "verified").length,
-      unverified: allDocuments.filter((d) => d.status === "unverified").length,
+      pending: allDocuments.filter((d) => d.status === "unverified").length,
+      rejected: allDocuments.filter((d) => d.status === "rejected").length,
       missing: allDocuments.filter((d) => d.status === "missing").length,
     }
   }, [])
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-5">
         {[
-          { label: "Total documents", value: summary.total },
-          { label: "Verified", value: summary.verified },
-          { label: "Unverified", value: summary.unverified },
-          { label: "Missing", value: summary.missing },
+          { label: "Total documents", value: summary.total, cls: "text-foreground" },
+          { label: "Verified", value: summary.verified, cls: "text-success" },
+          { label: "Pending", value: summary.pending, cls: "text-warning-foreground" },
+          { label: "Rejected", value: summary.rejected, cls: "text-destructive" },
+          { label: "Missing", value: summary.missing, cls: "text-muted-foreground" },
         ].map((s) => (
           <div key={s.label} className="rounded-lg border border-border bg-card p-4">
             <p className="text-xs text-muted-foreground">{s.label}</p>
-            <p className="mt-1 font-mono text-xl font-semibold text-foreground">{s.value.toLocaleString("en-US")}</p>
+            <p className={cn("mt-1 font-mono text-xl font-semibold", s.cls)}>{s.value.toLocaleString("en-US")}</p>
           </div>
         ))}
       </div>
@@ -139,7 +164,8 @@ export function DocumentsTable() {
             <SelectGroup>
               <SelectItem value="all">All statuses</SelectItem>
               <SelectItem value="verified">Verified</SelectItem>
-              <SelectItem value="unverified">Unverified</SelectItem>
+              <SelectItem value="unverified">Pending</SelectItem>
+              <SelectItem value="rejected">Rejected</SelectItem>
               <SelectItem value="missing">Missing</SelectItem>
             </SelectGroup>
           </SelectContent>
@@ -176,6 +202,7 @@ export function DocumentsTable() {
               <th className="px-4 py-3 font-medium">Agent</th>
               <th className="px-4 py-3 font-medium">Verified by</th>
               <th className="px-4 py-3 font-medium">Status</th>
+              <th className="px-4 py-3 text-right font-medium">Download</th>
             </tr>
           </thead>
           <tbody>
@@ -205,11 +232,25 @@ export function DocumentsTable() {
                 <td className="px-4 py-3">
                   <DocStatusBadge status={doc.status} />
                 </td>
+                <td className="px-4 py-3 text-right">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={!getDocumentFile(doc)}
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      downloadDocument(doc)
+                    }}
+                  >
+                    <Download data-icon="inline-start" />
+                    Download
+                  </Button>
+                </td>
               </tr>
             ))}
             {paged.length === 0 && (
               <tr>
-                <td colSpan={5} className="px-4 py-10 text-center text-sm text-muted-foreground">
+                <td colSpan={6} className="px-4 py-10 text-center text-sm text-muted-foreground">
                   No documents match your filters.
                 </td>
               </tr>
@@ -286,13 +327,44 @@ export function DocumentsTable() {
                     <p className="mt-1 text-foreground">{documentTypeLabels[selected.type] ?? selected.type}</p>
                   </div>
                 </div>
+                {selected.status === "rejected" && selected.reason && (
+                  <div className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2">
+                    <p className="text-xs font-medium text-destructive">Rejection reason</p>
+                    <p className="mt-0.5 text-sm text-destructive/90">{selected.reason}</p>
+                  </div>
+                )}
               </div>
-              <SheetFooter>
+              <SheetFooter className="gap-2">
+                {selected.status !== "missing" && (
+                  <div className="grid w-full grid-cols-2 gap-2">
+                    <Button
+                      variant="outline"
+                      className="text-destructive hover:text-destructive"
+                      onClick={() => setSelected({ ...selected, status: "rejected", reason: "Marked for correction during review" })}
+                    >
+                      Reject
+                    </Button>
+                    <Button onClick={() => setSelected({ ...selected, status: "verified", verifiedBy: "Admin User" })}>
+                      Verify document
+                    </Button>
+                  </div>
+                )}
+                {getDocumentFile(selected) && (
+                  <Button
+                    variant="secondary"
+                    className="w-full justify-center"
+                    onClick={() => downloadDocument(selected)}
+                  >
+                    <Download data-icon="inline-start" />
+                    Download document
+                  </Button>
+                )}
                 <Button
+                  variant="outline"
                   render={<Link href={`/admin/applications/${selected.appId}`} />}
                   className="w-full justify-center"
                 >
-                  View application
+                  Open full case
                 </Button>
                 <SheetClose render={<Button variant="outline" className="w-full justify-center" />}>
                   Close

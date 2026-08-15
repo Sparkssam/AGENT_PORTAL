@@ -14,7 +14,8 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { AppStatusBadge, DepositStatusBadge } from "@/components/admin/status-badge"
-import { applications, statusLabels, type AppStatus } from "@/lib/admin-data"
+import { applications, computeCaseHealth, statusLabels, type AppStatus, type HealthTone } from "@/lib/admin-data"
+import { cn } from "@/lib/utils"
 
 const statusOptions: AppStatus[] = [
   "SUBMITTED",
@@ -26,6 +27,13 @@ const statusOptions: AppStatus[] = [
 ]
 
 const PAGE_SIZE = 6
+
+const healthMeta: Record<HealthTone, { label: string; className: string }> = {
+  healthy: { label: "On track", className: "bg-success" },
+  attention: { label: "Attention", className: "bg-warning" },
+  critical: { label: "Critical", className: "bg-destructive" },
+  neutral: { label: "In progress", className: "bg-accent" },
+}
 
 export function ApplicationsTable() {
   const [query, setQuery] = useState("")
@@ -155,12 +163,16 @@ export function ApplicationsTable() {
                 <th className="px-4 py-3">Phone</th>
                 <th className="px-4 py-3">Channel</th>
                 <th className="px-4 py-3">Sector</th>
+                <th className="px-4 py-3">Health</th>
                 <th className="px-4 py-3">App Status</th>
                 <th className="px-4 py-3">Dep. Status</th>
               </tr>
             </thead>
             <tbody>
-              {paged.map((app) => (
+              {paged.map((app) => {
+                const health = computeCaseHealth(app)
+                const meta = healthMeta[health.tone]
+                return (
                 <tr key={app.id} className="border-b border-border last:border-0 hover:bg-secondary/50">
                   <td className="px-4 py-3.5">
                     <Link href={`/admin/applications/${app.id}`} className="font-mono text-sm font-medium text-foreground hover:underline">
@@ -172,16 +184,25 @@ export function ApplicationsTable() {
                   <td className="px-4 py-3.5 text-foreground">{app.channel}</td>
                   <td className="px-4 py-3.5 text-foreground">{app.sector}</td>
                   <td className="px-4 py-3.5">
+                    <div className="flex min-w-28 items-center gap-2">
+                      <span className={cn("size-2 rounded-full", meta.className)} aria-hidden="true" />
+                      <div>
+                        <p className="text-xs font-semibold text-foreground">{meta.label}</p>
+                        <p className="text-[11px] text-muted-foreground">{health.docsVerified}/{health.docsTotal} docs</p>
+                      </div>
+                    </div>
+                  </td>
+                  <td className="px-4 py-3.5">
                     <AppStatusBadge status={app.status} />
                   </td>
                   <td className="px-4 py-3.5">
                     <DepositStatusBadge status={app.depositStatus} />
                   </td>
                 </tr>
-              ))}
+              )})}
               {paged.length === 0 && (
                 <tr>
-                  <td colSpan={7} className="px-4 py-10 text-center text-sm text-muted-foreground">
+                  <td colSpan={8} className="px-4 py-10 text-center text-sm text-muted-foreground">
                     No applications match your filters.
                   </td>
                 </tr>

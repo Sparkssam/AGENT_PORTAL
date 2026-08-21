@@ -1,8 +1,8 @@
 import Link from "next/link"
-import { CheckCircle2, Clock, XCircle, CircleDashed, ArrowRight } from "lucide-react"
+import { CheckCircle2, Clock, XCircle, CircleDashed, ArrowRight, FileWarning } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
-import type { Document, DocumentStatus } from "@/lib/admin-data"
+import type { CorrectionItem, Document, DocumentStatus } from "@/lib/domain"
 
 const meta: Record<
   DocumentStatus,
@@ -14,22 +14,53 @@ const meta: Record<
   missing: { icon: CircleDashed, iconCls: "text-muted-foreground", label: "Missing", labelCls: "text-muted-foreground" },
 }
 
+const fieldLabels: Record<string, string> = {
+  application: "Application details",
+  phone: "Phone number",
+  idNumber: "ID number",
+  tinNumber: "TIN number",
+  agentName: "Full name",
+  businessName: "Channel name",
+  idType: "ID type",
+  issuedPlace: "Issued place",
+  issuedDate: "Issued date",
+  expireDate: "Expiry date",
+  gender: "Gender",
+  province: "Region",
+  district: "District",
+  ward: "Ward",
+  street: "Street",
+  houseNumber: "House / plot number",
+}
+
+function itemLabel(item: CorrectionItem, documents: Document[]) {
+  if (item.kind === "document") {
+    const doc = documents.find((d) => d.type === item.target || d.name === item.target)
+    return doc?.name ?? item.target.replaceAll("_", " ")
+  }
+  return fieldLabels[item.target] ?? item.target.replaceAll("_", " ")
+}
+
 /**
- * A precise, per-document correction list. Instead of a single "Rejected"
- * badge, it shows exactly which documents are accepted, pending, rejected
- * (with the reviewer's reason) or missing, and gives the agent a direct
- * "Fix now" action for anything that needs work.
+ * Checklist of reviewer notes plus document status. Field items come from the
+ * stored correction request; documents still show reject/missing status.
  */
 export function CorrectionChecklist({
   documents,
-  fixHref = "/agent/documents",
+  items = [],
+  summary,
+  fixHref = "/agent/apply",
   showFix = true,
 }: {
   documents: Document[]
+  items?: CorrectionItem[]
+  summary?: string
   fixHref?: string
   showFix?: boolean
 }) {
   const needsWork = documents.filter((d) => d.status === "rejected" || d.status === "missing").length
+  const fieldItems = items.filter((item) => item.kind === "field")
+  const openCount = needsWork + fieldItems.length
 
   return (
     <div className="rounded-lg border border-border bg-card">
@@ -38,16 +69,48 @@ export function CorrectionChecklist({
         <span
           className={cn(
             "rounded-md px-2 py-1 text-xs font-medium",
-            needsWork > 0 ? "bg-warning/20 text-warning-foreground" : "bg-success/15 text-success",
+            openCount > 0 ? "bg-warning/20 text-warning-foreground" : "bg-success/15 text-success",
           )}
         >
-          {needsWork > 0 ? `${needsWork} to fix` : "All clear"}
+          {openCount > 0 ? `${openCount} to fix` : "All clear"}
         </span>
       </div>
+      {summary ? (
+        <p className="border-b border-border px-5 py-3 text-sm text-muted-foreground">{summary}</p>
+      ) : null}
+      {fieldItems.length > 0 ? (
+        <ul className="divide-y divide-border border-b border-border">
+          {fieldItems.map((item) => (
+            <li key={item.id} className="flex items-start gap-3 px-5 py-3.5">
+              <FileWarning className="mt-0.5 size-4 shrink-0 text-warning-foreground" />
+              <div className="min-w-0 flex-1">
+                <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
+                  <span className="text-sm font-medium text-foreground">{itemLabel(item, documents)}</span>
+                  <span className="text-xs font-medium text-warning-foreground">· Field to update</span>
+                </div>
+                <p className="mt-0.5 text-xs text-muted-foreground">{item.reason}</p>
+              </div>
+              {showFix && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  render={<Link href="/agent/apply" />}
+                  nativeButton={false}
+                  className="shrink-0"
+                >
+                  Fix now
+                  <ArrowRight data-icon="inline-end" />
+                </Button>
+              )}
+            </li>
+          ))}
+        </ul>
+      ) : null}
       <ul className="divide-y divide-border">
         {documents.map((doc) => {
           const m = meta[doc.status]
           const Icon = m.icon
+          const requested = items.find((item) => item.kind === "document" && (item.target === doc.type || item.target === doc.name))
           const actionable = doc.status === "rejected" || doc.status === "missing"
           return (
             <li key={doc.id} className="flex items-start gap-3 px-5 py-3.5">
@@ -57,10 +120,10 @@ export function CorrectionChecklist({
                   <span className="text-sm font-medium text-foreground">{doc.name}</span>
                   <span className={cn("text-xs font-medium", m.labelCls)}>· {m.label}</span>
                 </div>
-                {doc.reason && actionable && (
-                  <p className="mt-0.5 text-xs text-muted-foreground">{doc.reason}</p>
+                {(requested?.reason || (doc.reason && actionable)) && (
+                  <p className="mt-0.5 text-xs text-muted-foreground">{requested?.reason || doc.reason}</p>
                 )}
-                {doc.status === "missing" && !doc.reason && (
+                {doc.status === "missing" && !doc.reason && !requested && (
                   <p className="mt-0.5 text-xs text-muted-foreground">Not uploaded yet.</p>
                 )}
               </div>

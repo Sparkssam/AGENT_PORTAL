@@ -1,99 +1,31 @@
 // Mock data layer for the Kinetic Admin Portal.
-// Mirrors the data model from the Agent Application & Document Management
-// Portal implementation plan (applications, agents, documents, status history).
+// Domain types and helpers live in lib/domain.ts so client bundles do not pull this file.
 
-export type AppStatus =
-  | "DRAFT"
-  | "SUBMITTED"
-  | "PENDING_REVIEW"
-  | "IN_PROGRESS"
-  | "NEEDS_CORRECTION"
-  | "COMPLETED"
-  | "REJECTED"
-
-export type DepositStatus = "PENDING" | "SUBMITTED" | "CLEARED" | "REJECTED" | "AWAITING_PROOF"
-
-export type DocumentStatus = "verified" | "unverified" | "missing" | "rejected"
-
-export const statusLabels: Record<AppStatus, string> = {
-  DRAFT: "Draft",
-  SUBMITTED: "Submitted",
-  PENDING_REVIEW: "Pending Review",
-  IN_PROGRESS: "In Progress",
-  NEEDS_CORRECTION: "Needs Correction",
-  COMPLETED: "Completed",
-  REJECTED: "Rejected",
-}
-
-export const depositLabels: Record<DepositStatus, string> = {
-  PENDING: "Pending",
-  SUBMITTED: "Submitted",
-  CLEARED: "Cleared",
-  REJECTED: "Rejected",
-  AWAITING_PROOF: "Awaiting Proof",
-}
-
-export interface Document {
-  id: string
-  name: string
-  type: string
-  status: DocumentStatus
-  verifiedBy?: string
-  fileType: "image" | "pdf"
-  previewUrl?: string
-  fileUrl?: string
-  fileExtension?: string
-  /** Reviewer note explaining why a document was rejected / needs re-upload. */
-  reason?: string
-}
-
-export interface TimelineEvent {
-  id: string
-  actor: string
-  action: string
-  detail?: string
-  timestamp: string
-}
-
-export interface Application {
-  id: string
-  appNumber: string
-  agentName: string
-  businessName?: string
-  phone: string
-  email: string
-  channel: string
-  channelParentType: string
-  channelParentName: string
-  channelManagerType: string
-  channelManagerName: string
-  channelType: string
-  sector: string
-  status: AppStatus
-  depositStatus: DepositStatus
-  depositAmount: number
-  depositReference?: string
-  idType: string
-  idNumber: string
-  issuedPlace: string
-  issuedDate: string
-  expireDate: string
-  gender: string
-  country: string
-  province: string
-  district: string
-  ward: string
-  street: string
-  houseNumber: string
-  lat: number
-  lng: number
-  submittedAt: string
-  daysPending: number
-  documents: Document[]
-  timeline: TimelineEvent[]
-  fieldsComplete: number
-  fieldsTotal: number
-}
+export type {
+  Agent,
+  AppStatus,
+  Application,
+  AuditCategory,
+  AuditLogEntry,
+  AuditSeverity,
+  CaseHealth,
+  CorrectionItem,
+  DepositStatus,
+  Document,
+  DocumentStatus,
+  DuplicateMatch,
+  HealthTone,
+  TimelineEvent,
+} from "@/lib/domain"
+export {
+  buildDocumentFileName,
+  computeCaseHealth,
+  depositLabels,
+  getDocumentFile,
+  sanitizeFileToken,
+  statusLabels,
+} from "@/lib/domain"
+import type { Agent, Application, AuditLogEntry, Document, DocumentStatus, TimelineEvent } from "@/lib/domain"
 
 type DocOverride = DocumentStatus | { status: DocumentStatus; reason?: string }
 
@@ -519,18 +451,6 @@ export const recentActivity: TimelineEvent[] = [
   { id: "a6", actor: "Michael Manager", action: "added a note to APP-8888-TZ", detail: "Note: Requires escalated review", timestamp: "4 hrs ago" },
 ]
 
-export interface Agent {
-  id: string
-  name: string
-  agentId: string
-  phone: string
-  email: string
-  channel: "Retail Partner" | "Direct Sales" | "Third-Party"
-  apps: number
-  status: "Active" | "Suspended" | "Pending"
-  joined: string
-}
-
 export const agents: Agent[] = [
   { id: "1", name: "Juma Mushi", agentId: "AGT-492", phone: "+255 754 123 456", email: "j.mushi@kinetic.co.tz", channel: "Retail Partner", apps: 3, status: "Active", joined: "Oct 12, 2023" },
   { id: "2", name: "Amina Said", agentId: "AGT-381", phone: "+255 713 987 654", email: "a.said@kinetic.co.tz", channel: "Direct Sales", apps: 2, status: "Active", joined: "Nov 05, 2023" },
@@ -564,139 +484,10 @@ export const monthlyVolume = [
   { month: "May", submitted: 2600, inReview: 1400, approved: 1800, rejected: 120 },
 ]
 
-export function formatCurrencyTZS(amount: number) {
-  return `TZS ${amount.toLocaleString("en-US")}`
-}
+export { formatCurrencyTZS } from "@/lib/format"
 
 export function getApplicationById(id: string) {
   return applications.find((a) => a.id === id)
-}
-
-/**
- * Collapses an arbitrary label into a safe filename token (alphanumerics only),
- * e.g. "John Doe Enterprise" -> "JohnDoeEnterprise", "M-Pesa" -> "MPesa".
- */
-export function sanitizeFileToken(value: string) {
-  return value.trim().replace(/[^a-zA-Z0-9]+/g, "")
-}
-
-/**
- * Builds the standardized download filename in the Name_Doc_Network format,
- * e.g. "JohnDoeEnterprise_IDCardFront_SubAgent.png".
- */
-export function buildDocumentFileName(opts: {
-  agentName: string
-  docName: string
-  network: string
-  extension?: string
-}) {
-  const name = sanitizeFileToken(opts.agentName) || "Agent"
-  const doc = sanitizeFileToken(opts.docName) || "Document"
-  const network = sanitizeFileToken(opts.network) || "Network"
-  const ext = (opts.extension ?? "png").replace(/^\.+/, "").toLowerCase()
-  return `${name}_${doc}_${network}.${ext}`
-}
-
-/**
- * Resolves the downloadable source for a document. Returns null when there is
- * nothing to download (e.g. the document is still missing).
- */
-export function getDocumentFile(doc: Document) {
-  const url = doc.fileUrl ?? doc.previewUrl
-  if (!url || doc.status === "missing") return null
-  const extension = doc.fileExtension ?? url.split(".").pop()?.split("?")[0] ?? "png"
-  return { url, extension }
-}
-
-export type HealthTone = "healthy" | "attention" | "critical" | "neutral"
-
-export interface CaseHealth {
-  /** Percentage of required application fields completed. */
-  appPercent: number
-  fieldsComplete: number
-  fieldsTotal: number
-  docsVerified: number
-  docsTotal: number
-  docsPending: number
-  docsRejected: number
-  docsMissing: number
-  /** Documents the agent must act on (rejected + missing). */
-  corrections: number
-  depositCleared: boolean
-  /** Overall traffic-light state for the case. */
-  tone: HealthTone
-  /** The single most important thing to do next, agent-facing. */
-  nextAction: { label: string; href: string }
-}
-
-/**
- * Derives a single "case file" health summary from an application so both the
- * agent and admin views can answer: Where am I? What's missing? What's next?
- */
-export function computeCaseHealth(app: Application): CaseHealth {
-  const docsTotal = app.documents.length
-  const docsVerified = app.documents.filter((d) => d.status === "verified").length
-  const docsPending = app.documents.filter((d) => d.status === "unverified").length
-  const docsRejected = app.documents.filter((d) => d.status === "rejected").length
-  const docsMissing = app.documents.filter((d) => d.status === "missing").length
-  const corrections = docsRejected + docsMissing
-  const appPercent = app.fieldsTotal === 0 ? 0 : Math.round((app.fieldsComplete / app.fieldsTotal) * 100)
-  const depositCleared = app.depositStatus === "CLEARED"
-
-  let tone: HealthTone = "neutral"
-  if (app.status === "REJECTED") tone = "critical"
-  else if (app.status === "COMPLETED") tone = "healthy"
-  else if (app.status === "NEEDS_CORRECTION" || corrections > 0 || app.depositStatus === "REJECTED") tone = "attention"
-  else if (docsVerified === docsTotal && appPercent === 100 && depositCleared) tone = "healthy"
-  else tone = "neutral"
-
-  const problemDoc = app.documents.find((d) => d.status === "rejected") ?? app.documents.find((d) => d.status === "missing")
-
-  let nextAction: { label: string; href: string }
-  if (app.status === "REJECTED") {
-    nextAction = { label: "Contact support", href: "/agent/dashboard" }
-  } else if (app.status === "COMPLETED") {
-    nextAction = { label: "View approval summary", href: `/agent/applications/${app.id}` }
-  } else if (problemDoc) {
-    nextAction = { label: `Fix ${problemDoc.name}`, href: "/agent/documents" }
-  } else if (!depositCleared) {
-    nextAction = { label: "Complete your deposit", href: `/agent/applications/${app.id}` }
-  } else if (appPercent < 100) {
-    nextAction = { label: "Complete your application", href: `/agent/applications/${app.id}` }
-  } else {
-    nextAction = { label: "Track review status", href: `/agent/applications/${app.id}` }
-  }
-
-  return {
-    appPercent,
-    fieldsComplete: app.fieldsComplete,
-    fieldsTotal: app.fieldsTotal,
-    docsVerified,
-    docsTotal,
-    docsPending,
-    docsRejected,
-    docsMissing,
-    corrections,
-    depositCleared,
-    tone,
-    nextAction,
-  }
-}
-
-export type AuditCategory = "Application" | "Document" | "Agent" | "System" | "Security"
-export type AuditSeverity = "info" | "warning" | "critical"
-
-export interface AuditLogEntry {
-  id: string
-  actor: string
-  actorRole: string
-  category: AuditCategory
-  severity: AuditSeverity
-  action: string
-  detail: string
-  target: string
-  ipAddress: string
-  timestamp: string
 }
 
 export const auditLog: AuditLogEntry[] = [

@@ -3,10 +3,10 @@ import { ArrowRight, FileCheck2, FolderCheck, Wallet, AlertTriangle } from "luci
 import { cn } from "@/lib/utils"
 import {
   computeCaseHealth,
-  formatCurrencyTZS,
   type Application,
   type HealthTone,
-} from "@/lib/admin-data"
+} from "@/lib/domain"
+import { formatCurrencyTZS } from "@/lib/format"
 import { AppStatusBadge, DepositStatusBadge } from "@/components/admin/status-badge"
 
 const toneDot: Record<HealthTone, string> = {

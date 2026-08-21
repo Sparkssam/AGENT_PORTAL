@@ -3,8 +3,7 @@
 import { useState } from "react"
 import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
-import { Bell, Menu, X, LogOut, UserRound, Settings } from "lucide-react"
-import { Avatar, AvatarFallback } from "@/components/ui/avatar"
+import { Menu, X, LogOut, UserRound, Settings } from "lucide-react"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -16,14 +15,19 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { Button } from "@/components/ui/button"
 import { AgentMobileNav } from "@/components/agent/agent-mobile-nav"
-import { currentAgent, unreadNotificationCount } from "@/lib/agent-data"
+import { NotificationBell } from "@/components/agent/notification-bell"
+import { WorkspaceSearch } from "@/components/workspace-search"
+import { WorkspaceIdentity } from "@/components/workspace-identity"
+import { type AgentNotification, type AgentProfile } from "@/lib/agent-data"
+import { useAuth } from "@/lib/auth-context"
 
 const sectionLabels: Record<string, string> = {
-  "/agent/dashboard": "Dashboard",
+  "/agent/apply": "New Application",
+  "/agent/dashboard": "Overview",
+  "/agent/help": "Help Center",
   "/agent/applications": "My Applications",
-  "/agent/documents": "Documents",
-  "/agent/notifications": "Notifications",
   "/agent/profile": "Profile",
+  "/agent/settings": "Settings",
 }
 
 function currentSectionLabel(pathname: string | null) {
@@ -32,77 +36,76 @@ function currentSectionLabel(pathname: string | null) {
   return match ? sectionLabels[match] : "Agent Workspace"
 }
 
-export function AgentTopbar() {
+export function AgentTopbar({
+  agent,
+  notifications = [],
+  live = false,
+}: {
+  agent?: AgentProfile
+  notifications?: AgentNotification[]
+  live?: boolean
+}) {
   const [mobileNavOpen, setMobileNavOpen] = useState(false)
+  const [query, setQuery] = useState("")
   const pathname = usePathname()
   const router = useRouter()
-  const unread = unreadNotificationCount()
+  const { user, logout } = useAuth()
+  const name = user?.name ?? agent?.fullName ?? "Agent"
+  const email = user?.email ?? agent?.email ?? ""
+  const initials = user?.initials ?? agent?.avatarInitials ?? "AG"
+
+  async function handleLogout() {
+    await logout()
+    router.push("/login")
+  }
 
   return (
-    <header className="flex h-16 items-center gap-4 border-b border-border bg-background px-4 md:px-6">
+    <header className="flex h-16 items-center gap-3 bg-background px-4 md:px-8">
       <Button
         variant="ghost"
         size="icon"
-        className="md:hidden"
+        className="rounded-full md:hidden"
         onClick={() => setMobileNavOpen((v) => !v)}
         aria-label={mobileNavOpen ? "Close menu" : "Open menu"}
       >
         {mobileNavOpen ? <X /> : <Menu />}
       </Button>
 
-      <div className="min-w-0">
-        <p className="text-xs font-medium tracking-wider text-muted-foreground/70 uppercase">Agent Workspace</p>
+      <div className="min-w-0 md:hidden">
         <p className="truncate text-sm font-semibold text-foreground">{currentSectionLabel(pathname)}</p>
       </div>
 
-      <div className="ml-auto flex items-center gap-3 md:gap-4">
-        <Button
-          variant="ghost"
-          size="icon"
-          className="relative"
-          aria-label="Notifications"
-          nativeButton={false}
-          render={<Link href="/agent/notifications" />}
-        >
-          <Bell />
-          {unread > 0 && (
-            <span className="absolute right-1.5 top-1.5 flex size-4 items-center justify-center rounded-full bg-destructive text-[9px] font-semibold text-primary-foreground">
-              {unread}
-            </span>
-          )}
-        </Button>
+      <WorkspaceSearch
+        value={query}
+        onChange={setQuery}
+        onSubmit={(value) => router.push(value ? `/agent/applications?q=${encodeURIComponent(value)}` : "/agent/applications")}
+        placeholder="Search applications..."
+        className="hidden md:flex"
+      />
+
+      <div className="ml-auto flex items-center gap-2 md:gap-3">
+        <NotificationBell notifications={notifications} persist={live} />
 
         <DropdownMenu>
           <DropdownMenuTrigger
             render={
-              <button
-                type="button"
-                className="flex items-center gap-3 rounded-md py-1 pl-1 pr-2 transition-colors hover:bg-secondary"
-              />
+              <button type="button" className="rounded-2xl outline-none" />
             }
           >
-            <div className="hidden text-right sm:block">
-              <p className="text-sm font-medium leading-tight text-foreground">{currentAgent.fullName}</p>
-              <p className="text-xs leading-tight text-muted-foreground">{currentAgent.role}</p>
-            </div>
-            <Avatar className="size-9">
-              <AvatarFallback className="bg-primary text-primary-foreground">
-                {currentAgent.avatarInitials}
-              </AvatarFallback>
-            </Avatar>
+            <WorkspaceIdentity name={name} initials={initials} />
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-56">
             <DropdownMenuGroup>
               <DropdownMenuLabel>
-                <p className="text-sm font-medium">{currentAgent.fullName}</p>
-                <p className="text-xs text-muted-foreground">{currentAgent.email}</p>
+                <p className="text-sm font-medium">{name}</p>
+                <p className="text-xs text-muted-foreground">{email}</p>
               </DropdownMenuLabel>
             </DropdownMenuGroup>
             <DropdownMenuSeparator />
             <DropdownMenuGroup>
               <DropdownMenuItem render={<Link href="/agent/profile" />}>
                 <UserRound data-icon="inline-start" />
-                Profile settings
+                Profile
               </DropdownMenuItem>
               <DropdownMenuItem render={<Link href="/agent/settings" />}>
                 <Settings data-icon="inline-start" />
@@ -111,7 +114,7 @@ export function AgentTopbar() {
             </DropdownMenuGroup>
             <DropdownMenuSeparator />
             <DropdownMenuItem
-              onClick={() => router.push("/login")}
+              onClick={() => void handleLogout()}
               className="text-destructive focus:text-destructive"
             >
               <LogOut data-icon="inline-start" />
@@ -121,7 +124,7 @@ export function AgentTopbar() {
         </DropdownMenu>
       </div>
 
-      <AgentMobileNav open={mobileNavOpen} onClose={() => setMobileNavOpen(false)} />
+      <AgentMobileNav open={mobileNavOpen} onClose={() => setMobileNavOpen(false)} agent={agent} />
     </header>
   )
 }

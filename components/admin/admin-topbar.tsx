@@ -1,10 +1,9 @@
 "use client"
 
 import { useState } from "react"
+import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { Bell, LogOut, Search, Menu, X } from "lucide-react"
-import { Input } from "@/components/ui/input"
-import { Avatar, AvatarFallback } from "@/components/ui/avatar"
+import { Bell, LogOut, Menu, X } from "lucide-react"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -16,70 +15,53 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { Button } from "@/components/ui/button"
 import { AdminMobileNav } from "@/components/admin/admin-mobile-nav"
+import { WorkspaceSearch } from "@/components/workspace-search"
+import { WorkspaceIdentity } from "@/components/workspace-identity"
 import { useAuth } from "@/lib/auth-context"
 
 export function AdminTopbar() {
   const [mobileNavOpen, setMobileNavOpen] = useState(false)
+  const [query, setQuery] = useState("")
   const { user, logout } = useAuth()
   const router = useRouter()
 
   const name = user?.name ?? "Admin User"
-  const title = user?.title ?? "Super Administrator"
   const email = user?.email ?? "admin@kinetic.co.tz"
   const initials = user?.initials ?? "AU"
 
   function handleLogout() {
-    logout()
-    router.push("/login")
+    void logout().then(() => router.push("/login"))
   }
 
   return (
-    <header className="flex h-16 items-center gap-4 border-b border-border bg-background px-4 md:px-6">
+    <header className="flex h-16 items-center gap-3 bg-background px-4 md:px-8">
       <Button
         variant="ghost"
         size="icon"
-        className="md:hidden"
+        className="rounded-full md:hidden"
         onClick={() => setMobileNavOpen((v) => !v)}
         aria-label={mobileNavOpen ? "Close menu" : "Open menu"}
       >
         {mobileNavOpen ? <X /> : <Menu />}
       </Button>
 
-      <div className="relative w-full max-w-md">
-        <Search
-          data-icon="inline-start"
-          className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"
-        />
-        <Input
-          type="search"
-          placeholder="Search records, agents, or TXNs..."
-          className="pl-9"
-          aria-label="Search records, agents, or transactions"
-        />
-      </div>
+      <WorkspaceSearch
+        value={query}
+        onChange={setQuery}
+        onSubmit={(value) => router.push(value ? `/admin/applications?q=${encodeURIComponent(value)}` : "/admin/applications")}
+        placeholder="Search applications or agents..."
+        className="hidden sm:flex"
+      />
 
-      <div className="ml-auto flex items-center gap-3 md:gap-4">
-        <Button variant="ghost" size="icon" className="relative" aria-label="Notifications">
+      <div className="ml-auto flex items-center gap-2 md:gap-3">
+        <Button variant="ghost" size="icon" className="relative rounded-full" aria-label="Notifications">
           <Bell />
           <span className="absolute right-2 top-2 size-2 rounded-full bg-destructive" />
         </Button>
 
         <DropdownMenu>
-          <DropdownMenuTrigger
-            render={
-              <button
-                type="button"
-                className="flex items-center gap-3 rounded-md py-1 pl-1 pr-2 transition-colors hover:bg-secondary"
-              />
-            }
-          >
-            <div className="hidden text-right sm:block">
-              <p className="text-sm font-semibold leading-tight text-foreground">{name}</p>
-              <p className="text-xs leading-tight text-muted-foreground">{title}</p>
-            </div>
-            <Avatar className="size-9">
-              <AvatarFallback className="bg-primary text-primary-foreground">{initials}</AvatarFallback>
-            </Avatar>
+          <DropdownMenuTrigger render={<button type="button" className="rounded-2xl outline-none" />}>
+            <WorkspaceIdentity name={name} initials={initials} />
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-56">
             <DropdownMenuGroup>
@@ -90,8 +72,7 @@ export function AdminTopbar() {
             </DropdownMenuGroup>
             <DropdownMenuSeparator />
             <DropdownMenuGroup>
-              <DropdownMenuItem>Profile settings</DropdownMenuItem>
-              <DropdownMenuItem>Switch region</DropdownMenuItem>
+              <DropdownMenuItem render={<Link href="/admin/settings" />}>Settings</DropdownMenuItem>
               <DropdownMenuItem onClick={handleLogout} className="text-destructive focus:text-destructive">
                 <LogOut data-icon="inline-start" />
                 Log out

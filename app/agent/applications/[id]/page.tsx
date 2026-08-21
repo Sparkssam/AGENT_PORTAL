@@ -1,21 +1,26 @@
 import Link from "next/link"
-import { notFound } from "next/navigation"
+import { notFound, redirect } from "next/navigation"
 import { ArrowLeft, CheckCircle2, Download, MapPin } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { AppStatusBadge, DepositStatusBadge } from "@/components/admin/status-badge"
 import { CaseHealthCard } from "@/components/case-health-card"
 import { CorrectionChecklist } from "@/components/correction-checklist"
-import { formatCurrencyTZS, type AppStatus } from "@/lib/admin-data"
-import { currentApplication } from "@/lib/agent-data"
+import { formatCurrencyTZS } from "@/lib/format"
+import type { AppStatus } from "@/lib/domain"
+import { formatDateLong, formatGps, formatPhoneTZ } from "@/lib/format"
+import { loadAgentApplication, loadAgentShell } from "@/lib/data/workspace"
 
 const statusFlow: AppStatus[] = ["SUBMITTED", "PENDING_REVIEW", "IN_PROGRESS", "COMPLETED"]
 
 export default async function ApplicationDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
-  const application = currentApplication.id === id ? currentApplication : null
+  if (id === "new") redirect("/agent/apply")
+
+  const [{ agent }, application] = await Promise.all([loadAgentShell(), loadAgentApplication(id)])
 
   if (!application) notFound()
 
+  const suspended = agent.lifecycleStatus === "Suspended"
   const isRejectedOrCorrection = application.status === "REJECTED" || application.status === "NEEDS_CORRECTION"
   const currentIndex = statusFlow.indexOf(application.status)
 
@@ -42,18 +47,22 @@ export default async function ApplicationDetailPage({ params }: { params: Promis
               <AppStatusBadge status={application.status} />
             </div>
             <p className="mt-1 text-sm text-muted-foreground">
-              {application.businessName} · Submitted{" "}
-              {new Date(application.submittedAt).toLocaleDateString("en-US", {
-                day: "2-digit",
-                month: "short",
-                year: "numeric",
-              })}
+              {application.businessName}
+              {application.status === "DRAFT"
+                ? " · Draft"
+                : ` · Submitted ${formatDateLong(application.submittedAt, "local")}`}
             </p>
           </div>
-          <Button variant="outline">
-            <Download data-icon="inline-start" />
-            Download Summary
-          </Button>
+          {suspended ? null : application.status === "NEEDS_CORRECTION" || application.status === "DRAFT" ? (
+            <Button render={<Link href="/agent/apply" />} nativeButton={false}>
+              Continue application
+            </Button>
+          ) : (
+            <Button variant="outline">
+              <Download data-icon="inline-start" />
+              Download Summary
+            </Button>
+          )}
         </div>
       </div>
 
@@ -96,9 +105,12 @@ export default async function ApplicationDetailPage({ params }: { params: Promis
           <p className="text-sm font-medium text-warning-foreground">
             {application.status === "REJECTED" ? "This application was rejected." : "This application needs correction."}
           </p>
-          <p className="mt-1 text-sm text-warning-foreground/80">
-            Please review the notes from our team and contact support if you need help resolving this.
-          </p>
+          {isRejectedOrCorrection && (
+            <p className="mt-1 text-sm text-warning-foreground/80">
+              {application.correctionSummary ||
+                "Please review the notes from our team and contact support if you need help resolving this."}
+            </p>
+          )}
         </div>
       )}
 
@@ -110,24 +122,43 @@ export default async function ApplicationDetailPage({ params }: { params: Promis
             </div>
             <div className="grid grid-cols-1 gap-4 p-5 sm:grid-cols-2">
               <DetailRow label="Full name" value={application.agentName} />
-              <DetailRow label="Phone" value={application.phone} />
+              <DetailRow label="Phone" value={formatPhoneTZ(application.phone)} />
               <DetailRow label="Email" value={application.email} />
-              <DetailRow label="Business name" value={application.businessName ?? "—"} />
+              <DetailRow label="Channel name" value={application.businessName ?? "—"} />
               <DetailRow label="Sector" value={application.sector} />
               <DetailRow label="Channel" value={application.channel} />
+              <DetailRow label="Channel parent type" value={application.channelParentType || "—"} />
+              <DetailRow label="Channel parent name" value={application.channelParentName || "—"} />
+              <DetailRow label="Channel manager type" value={application.channelManagerType || "—"} />
+              <DetailRow label="Channel manager name" value={application.channelManagerName || "—"} />
+              <DetailRow label="Channel tier" value={application.channelType || "—"} />
               <DetailRow label="ID type" value={application.idType} />
               <DetailRow label="ID number" value={application.idNumber} />
+              <DetailRow label="Issued place" value={application.issuedPlace || "—"} />
+              <DetailRow label="Issued date" value={formatDateLong(application.issuedDate)} />
+              <DetailRow label="Expiry date" value={formatDateLong(application.expireDate)} />
+              <DetailRow label="Gender" value={application.gender || "—"} />
+              <DetailRow label="Ward" value={application.ward || "—"} />
+              <DetailRow label="House / plot number" value={application.houseNumber || "—"} />
               <div className="sm:col-span-2">
                 <DetailRow
                   label="Location"
-                  value={`${application.street}, ${application.ward}, ${application.district}, ${application.province}`}
+                  value={[application.street, application.ward, application.district, application.province, application.country]
+                    .filter(Boolean)
+                    .join(", ") || "—"}
                   icon={MapPin}
                 />
               </div>
+              <DetailRow label="GPS coordinates" value={formatGps(application.lat, application.lng)} />
             </div>
           </div>
 
-          <CorrectionChecklist documents={application.documents} fixHref="/agent/documents" />
+          <CorrectionChecklist
+            documents={application.documents}
+            items={application.corrections}
+            summary={application.correctionSummary}
+            fixHref="/agent/apply"
+          />
         </div>
 
         <div className="flex flex-col gap-6">
@@ -149,25 +180,6 @@ export default async function ApplicationDetailPage({ params }: { params: Promis
                 <span className="font-mono text-sm text-foreground">{application.depositReference}</span>
               </div>
             )}
-          </div>
-
-          <div className="rounded-lg border border-border bg-card">
-            <div className="border-b border-border px-5 py-4">
-              <h2 className="text-base font-semibold text-foreground">Timeline</h2>
-            </div>
-            <ul className="flex flex-col divide-y divide-border">
-              {application.timeline.map((event) => (
-                <li key={event.id} className="px-5 py-3.5">
-                  <p className="text-sm text-foreground">
-                    <span className="font-medium">{event.actor}</span> {event.action}
-                  </p>
-                  <p className="mt-0.5 text-xs text-muted-foreground">
-                    {event.timestamp}
-                    {event.detail ? ` · ${event.detail}` : ""}
-                  </p>
-                </li>
-              ))}
-            </ul>
           </div>
         </div>
       </div>

@@ -12,7 +12,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { auditLog, type AuditCategory, type AuditSeverity } from "@/lib/admin-data"
+import { type AuditCategory, type AuditLogEntry, type AuditSeverity } from "@/lib/admin-data"
 import { cn } from "@/lib/utils"
 
 const categoryOptions: AuditCategory[] = ["Application", "Document", "Agent", "System", "Security"]
@@ -35,14 +35,14 @@ function formatTimestamp(iso: string) {
 
 const PAGE_SIZE = 8
 
-export function AuditLogTable() {
+export function AuditLogTable({ entries }: { entries: AuditLogEntry[] }) {
   const [query, setQuery] = useState("")
   const [category, setCategory] = useState<string>("all")
   const [severity, setSeverity] = useState<string>("all")
   const [page, setPage] = useState(1)
 
   const filtered = useMemo(() => {
-    return auditLog.filter((entry) => {
+    return entries.filter((entry) => {
       const matchesQuery =
         query.trim() === "" ||
         entry.actor.toLowerCase().includes(query.toLowerCase()) ||
@@ -53,7 +53,7 @@ export function AuditLogTable() {
       const matchesSeverity = severity === "all" || entry.severity === severity
       return matchesQuery && matchesCategory && matchesSeverity
     })
-  }, [query, category, severity])
+  }, [query, category, severity, entries])
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))
   const paged = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)

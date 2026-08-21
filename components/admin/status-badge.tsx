@@ -1,6 +1,6 @@
 import { cn } from "@/lib/utils"
-import type { AppStatus, DepositStatus, DocumentStatus } from "@/lib/admin-data"
-import { statusLabels, depositLabels } from "@/lib/admin-data"
+import type { AppStatus, DepositStatus, DocumentStatus } from "@/lib/domain"
+import { statusLabels, depositLabels } from "@/lib/domain"
 
 const appStatusStyles: Record<AppStatus, string> = {
   DRAFT: "bg-muted text-muted-foreground",
@@ -56,12 +56,21 @@ const documentStatusStyles: Record<DocumentStatus, string> = {
 }
 
 const documentStatusLabels: Record<DocumentStatus, string> = {
-  verified: "Verified",
+  verified: "Approved",
   unverified: "Pending",
   rejected: "Rejected",
-  missing: "Missing",
+  missing: "Required",
 }
 
-export function DocumentStatusLabel({ status, className }: { status: DocumentStatus; className?: string }) {
-  return <span className={cn("text-xs font-medium", documentStatusStyles[status], className)}>{documentStatusLabels[status]}</span>
+export function DocumentStatusLabel({
+  status,
+  required,
+  className,
+}: {
+  status: DocumentStatus
+  required?: boolean
+  className?: string
+}) {
+  const label = status === "missing" && required === false ? "Not uploaded" : documentStatusLabels[status]
+  return <span className={cn("text-xs font-medium", documentStatusStyles[status], className)}>{label}</span>
 }

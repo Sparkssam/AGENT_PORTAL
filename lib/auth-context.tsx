@@ -2,59 +2,105 @@
 
 import type React from "react"
 import { createContext, useCallback, useContext, useEffect, useState } from "react"
-import { clearSession, findAccount, readSession, writeSession, SESSION_EVENT, type SessionUser } from "@/lib/auth"
+import { clearSession, type SessionUser, type UserRole } from "@/lib/auth"
+import { getSession, signIn as supabaseSignIn, signOut as supabaseSignOut, signUp as supabaseSignUp } from "@/lib/actions/auth"
+import { createClient } from "@/lib/supabase/client"
 
 interface AuthContextValue {
   user: SessionUser | null
   loading: boolean
-  login: (email: string, password: string) => SessionUser | null
-  loginAsUser: (user: SessionUser) => void
-  logout: () => void
+  backendEnabled: boolean
+  login: (email: string, password: string) => Promise<SessionUser | null>
+  register: (input: { fullName: string; email: string; phone: string; password: string }) => Promise<void>
+  logout: () => Promise<void>
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null)
+
+function initialsFrom(name: string, email: string) {
+  const parts = name.trim().split(/\s+/).filter(Boolean)
+  if (parts.length >= 2) return `${parts[0][0]}${parts[1][0]}`.toUpperCase()
+  if (parts[0]) return parts[0].slice(0, 2).toUpperCase()
+  return email.slice(0, 2).toUpperCase() || "AG"
+}
+
+function sessionFromJwt(user: {
+  id: string
+  email?: string | null
+  app_metadata?: Record<string, unknown>
+  user_metadata?: Record<string, unknown>
+}): SessionUser {
+  const rawRole = user.app_metadata?.role
+  const role: UserRole = rawRole === "admin" || rawRole === "super_admin" ? "admin" : "agent"
+  const name =
+    (typeof user.user_metadata?.full_name === "string" && user.user_metadata.full_name) || user.email || "User"
+  return {
+    id: user.id,
+    role,
+    name,
+    email: user.email ?? "",
+    title: role === "admin" ? "Administrator" : "Registered Agent",
+    initials: initialsFrom(name, user.email ?? ""),
+  }
+}
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<SessionUser | null>(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    setUser(readSession())
-    setLoading(false)
+    let cancelled = false
 
-    function handleChange() {
-      setUser(readSession())
+    async function hydrate() {
+      try {
+        const supabase = createClient()
+        const { data } = await supabase.auth.getSession()
+        const current = data.session?.user
+        if (!cancelled && current) {
+          setUser(sessionFromJwt(current))
+          setLoading(false)
+          return
+        }
+      } catch {
+        // Fall through to the server session lookup.
+      }
+
+      const session = await getSession()
+      if (!cancelled) {
+        setUser(session)
+        setLoading(false)
+      }
     }
 
-    window.addEventListener(SESSION_EVENT, handleChange)
-    window.addEventListener("storage", handleChange)
+    hydrate()
     return () => {
-      window.removeEventListener(SESSION_EVENT, handleChange)
-      window.removeEventListener("storage", handleChange)
+      cancelled = true
     }
   }, [])
 
-  const login = useCallback((email: string, password: string) => {
-    const account = findAccount(email, password)
-    if (account) {
-      writeSession(account)
-      setUser(account)
-    }
-    return account
+  const login = useCallback(async (email: string, password: string) => {
+    const session = await supabaseSignIn(email, password)
+    setUser(session)
+    return session
   }, [])
 
-  const loginAsUser = useCallback((sessionUser: SessionUser) => {
-    writeSession(sessionUser)
-    setUser(sessionUser)
-  }, [])
+  const register = useCallback(
+    async (input: { fullName: string; email: string; phone: string; password: string }) => {
+      await supabaseSignUp(input)
+    },
+    [],
+  )
 
-  const logout = useCallback(() => {
+  const logout = useCallback(async () => {
+    await supabaseSignOut()
     clearSession()
     setUser(null)
   }, [])
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, loginAsUser, logout }}>{children}</AuthContext.Provider>
+    <AuthContext.Provider value={{ user, loading, backendEnabled: true, login, register, logout }}>
+      {children}
+    </AuthContext.Provider>
   )
 }
 

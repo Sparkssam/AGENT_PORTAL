@@ -2,16 +2,16 @@
 
 import { Cell, Pie, PieChart } from "recharts"
 import { ChartContainer, ChartTooltip, ChartTooltipContent, type ChartConfig } from "@/components/ui/chart"
-import { sectorBreakdown, channelBreakdown } from "@/lib/admin-data"
 
 const colors = ["var(--chart-1)", "var(--chart-2)", "var(--chart-3)", "var(--chart-4)", "var(--chart-5)"]
 
-export function BreakdownChart({ type }: { type: "sector" | "channel" }) {
-  const data =
-    type === "sector"
-      ? sectorBreakdown.map((d) => ({ name: d.sector, value: d.value, count: d.count }))
-      : channelBreakdown.map((d) => ({ name: d.channel, value: d.value, count: d.count }))
-
+export function BreakdownChart({
+  type,
+  data,
+}: {
+  type: "sector" | "channel"
+  data: { name: string; value: number; count: number }[]
+}) {
   const config: ChartConfig = Object.fromEntries(
     data.map((d, i) => [d.name, { label: d.name, color: colors[i % colors.length] }]),
   )

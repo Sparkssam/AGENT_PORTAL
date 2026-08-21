@@ -1,20 +1,22 @@
 import { BadgeCheck } from "lucide-react"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { AppStatusBadge } from "@/components/admin/status-badge"
-import { currentAgent, currentApplication } from "@/lib/agent-data"
 import { ProfileForm } from "./profile-form"
+import { loadAgentWorkspace } from "@/lib/data/workspace"
+import { formatDateLong, formatPhoneTZ } from "@/lib/format"
+import { SetupBanner } from "@/components/setup-banner"
+import { PageBackLink } from "@/components/page-back-link"
 
-export default function ProfilePage() {
-  const memberSince = new Date(currentAgent.memberSince).toLocaleDateString("en-US", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-  })
+export default async function ProfilePage() {
+  const { mode, message, agent: currentAgent, application: currentApplication } = await loadAgentWorkspace()
+  const memberSince = formatDateLong(currentAgent.memberSince)
 
   return (
     <div className="mx-auto flex max-w-3xl flex-col gap-6 p-4 md:p-6">
+      <SetupBanner mode={mode} message={message} />
       <div>
-        <h1 className="text-2xl font-semibold tracking-tight text-foreground md:text-3xl">Profile</h1>
+        <PageBackLink fallback="/agent/settings" label="Back" />
+        <h1 className="mt-2 text-2xl font-semibold tracking-tight text-foreground md:text-3xl">Profile</h1>
         <p className="mt-1 text-sm text-muted-foreground">Manage your personal and account information.</p>
       </div>
 
@@ -39,12 +41,16 @@ export default function ProfilePage() {
 
       <div className="rounded-lg border border-border bg-card p-5">
         <h2 className="mb-4 text-base font-semibold text-foreground">Personal Information</h2>
-        <ProfileForm agent={currentAgent} />
+        <ProfileForm agent={currentAgent} live={mode === "live"} />
       </div>
 
       <div className="rounded-lg border border-border bg-card p-5">
         <h2 className="mb-3 text-base font-semibold text-foreground">Account</h2>
         <div className="flex flex-col divide-y divide-border">
+          <div className="flex items-center justify-between py-3">
+            <span className="text-sm text-muted-foreground">Phone</span>
+            <span className="font-mono text-sm text-foreground">{formatPhoneTZ(currentAgent.phone)}</span>
+          </div>
           <div className="flex items-center justify-between py-3">
             <span className="text-sm text-muted-foreground">Agent ID Number</span>
             <span className="font-mono text-sm text-foreground">{currentAgent.agentIdNumber}</span>

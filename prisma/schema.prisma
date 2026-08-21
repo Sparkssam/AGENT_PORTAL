@@ -1,0 +1,407 @@
+// Kinetic public schema, mapped for Prisma over the existing Supabase Postgres
+// database. Auth.users and storage stay in Supabase; this file models `public`.
+//
+// RLS / triggers / RPCs remain in supabase/migrations. Prisma uses DATABASE_URL
+// (privileged), so every action must still call requireAgent() / requireAdmin()
+// and use withDbGuards() for status numbering mutations.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+enum UserRole {
+  agent
+  admin
+  super_admin
+
+  @@map("user_role")
+}
+
+enum AgentLifecycle {
+  pending
+  active
+  suspended
+
+  @@map("agent_lifecycle")
+}
+
+enum CommercialChannel {
+  retail_partner
+  direct_sales
+  third_party
+
+  @@map("commercial_channel")
+}
+
+enum AppStatus {
+  DRAFT
+  SUBMITTED
+  PENDING_REVIEW
+  IN_PROGRESS
+  NEEDS_CORRECTION
+  COMPLETED
+  REJECTED
+
+  @@map("app_status")
+}
+
+enum DepositStatus {
+  PENDING
+  SUBMITTED
+  CLEARED
+  REJECTED
+  AWAITING_PROOF
+  VERIFIED
+
+  @@map("deposit_status")
+}
+
+enum DocumentStatus {
+  missing
+  unverified
+  verified
+  rejected
+
+  @@map("document_status")
+}
+
+enum NotificationCategory {
+  application
+  document
+  deposit
+  system
+
+  @@map("notification_category")
+}
+
+enum AuditCategory {
+  Application
+  Document
+  Agent
+  System
+  Security
+
+  @@map("audit_category")
+}
+
+enum AuditSeverity {
+  info
+  warning
+  critical
+
+  @@map("audit_severity")
+}
+
+enum CorrectionItemKind {
+  field
+  document
+
+  @@map("correction_item_kind")
+}
+
+model Channel {
+  id           String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name         String
+  code         String        @unique
+  active       Boolean       @default(true)
+  applications Application[]
+
+  @@map("channels")
+}
+
+model BusinessSector {
+  id           String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name         String
+  code         String        @unique
+  active       Boolean       @default(true)
+  applications Application[]
+
+  @@map("business_sectors")
+}
+
+model DocumentType {
+  code          String     @id
+  name          String
+  required      Boolean    @default(false)
+  allowedMime   String[]   @default(["image/jpeg", "image/png", "application/pdf"]) @map("allowed_mime")
+  maxSizeBytes  Int        @default(10485760) @map("max_size_bytes")
+  sortOrder     Int        @default(0) @map("sort_order")
+  documents     Document[]
+
+  @@map("document_types")
+}
+
+model Profile {
+  id        String   @id @db.Uuid
+  role      UserRole @default(agent)
+  fullName  String   @default("") @map("full_name")
+  email     String
+  phone     String?
+  title     String   @default("Registered Agent")
+  initials  String   @default("AG")
+  createdAt DateTime @default(dbgenerated("timezone('utc', now())")) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @default(dbgenerated("timezone('utc', now())")) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  agent                 Agent?
+  verifiedDocuments     Document[]          @relation("DocumentVerifier")
+  verifiedDeposits      DepositRecord[]     @relation("DepositVerifier")
+  statusChanges         StatusHistory[]
+  correctionRequests    CorrectionRequest[]
+  notifications         Notification[]
+  auditLogs             AuditLog[]
+  documentVerifications DocumentVerification[] @relation("VerificationSubject")
+  reviewedVerifications DocumentVerification[] @relation("VerificationReviewer")
+
+  @@map("profiles")
+}
+
+model Agent {
+  id                 String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId             String              @unique @map("user_id") @db.Uuid
+  agentCode          String?             @unique @map("agent_code")
+  status             AgentLifecycle      @default(pending)
+  commercialChannel  CommercialChannel?  @map("commercial_channel")
+  verified           Boolean             @default(false)
+  memberSince        DateTime            @default(dbgenerated("(timezone('utc', now()))::date")) @map("member_since") @db.Date
+  createdAt          DateTime            @default(dbgenerated("timezone('utc', now())")) @map("created_at") @db.Timestamptz(6)
+  updatedAt          DateTime            @default(dbgenerated("timezone('utc', now())")) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  profile      Profile       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  applications Application[]
+
+  @@index([status], map: "agents_status_idx")
+  @@map("agents")
+}
+
+model Application {
+  id                   String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  agentId              String     @map("agent_id") @db.Uuid
+  applicationNumber    String?    @unique @map("application_number")
+  status               AppStatus  @default(DRAFT)
+  channelId            String?    @map("channel_id") @db.Uuid
+  sectorId             String?    @map("sector_id") @db.Uuid
+  agentName            String?    @map("agent_name")
+  businessName         String?    @map("business_name")
+  phone                String?
+  email                String?
+  idType               String?    @map("id_type")
+  idNumber             String?    @map("id_number")
+  issuedPlace          String?    @map("issued_place")
+  issuedDate           DateTime?  @map("issued_date") @db.Date
+  expireDate           DateTime?  @map("expire_date") @db.Date
+  gender               String?
+  country              String     @default("Tanzania")
+  province             String?
+  district             String?
+  ward                 String?
+  street               String?
+  houseNumber          String?    @map("house_number")
+  lat                  Decimal?   @db.Decimal
+  lng                  Decimal?   @db.Decimal
+  locationAccuracy     Decimal?   @map("location_accuracy") @db.Decimal
+  locationCapturedAt   DateTime?  @map("location_captured_at") @db.Timestamptz(6)
+  channelParentType    String?    @map("channel_parent_type")
+  channelParentName    String?    @map("channel_parent_name")
+  channelManagerType   String?    @map("channel_manager_type")
+  channelManagerName   String?    @map("channel_manager_name")
+  channelType          String?    @map("channel_type")
+  tinNumber            String?    @map("tin_number")
+  notes                String?
+  adminNotes           String?    @map("admin_notes")
+  fieldsComplete       Int        @default(0) @map("fields_complete")
+  fieldsTotal          Int        @default(12) @map("fields_total")
+  submittedAt          DateTime?  @map("submitted_at") @db.Timestamptz(6)
+  reviewedAt           DateTime?  @map("reviewed_at") @db.Timestamptz(6)
+  completedAt          DateTime?  @map("completed_at") @db.Timestamptz(6)
+  rejectionReason      String?    @map("rejection_reason")
+  deletedAt            DateTime?  @map("deleted_at") @db.Timestamptz(6)
+  createdAt            DateTime   @default(dbgenerated("timezone('utc', now())")) @map("created_at") @db.Timestamptz(6)
+  updatedAt            DateTime   @default(dbgenerated("timezone('utc', now())")) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  agent               Agent               @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  channel             Channel?            @relation(fields: [channelId], references: [id])
+  sector              BusinessSector?     @relation(fields: [sectorId], references: [id])
+  documents           Document[]
+  deposit             DepositRecord?
+  statusHistory       StatusHistory[]
+  correctionRequests  CorrectionRequest[]
+
+  @@index([status], map: "applications_status_idx")
+  @@index([agentId], map: "applications_agent_id_idx")
+  @@index([phone], map: "applications_phone_idx")
+  @@index([idNumber], map: "applications_id_number_idx")
+  @@map("applications")
+}
+
+model Document {
+  id               String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  applicationId    String         @map("application_id") @db.Uuid
+  documentType     String         @map("document_type")
+  status           DocumentStatus @default(missing)
+  storageKey       String?        @map("storage_key")
+  originalName     String?        @map("original_name")
+  mimeType         String?        @map("mime_type")
+  fileSize         BigInt?        @map("file_size")
+  fileExtension    String?        @map("file_extension")
+  rejectionReason  String?        @map("rejection_reason")
+  verifiedById     String?        @map("verified_by") @db.Uuid
+  verifiedAt       DateTime?      @map("verified_at") @db.Timestamptz(6)
+  uploadedAt       DateTime?      @map("uploaded_at") @db.Timestamptz(6)
+  deletedAt        DateTime?      @map("deleted_at") @db.Timestamptz(6)
+  createdAt        DateTime       @default(dbgenerated("timezone('utc', now())")) @map("created_at") @db.Timestamptz(6)
+  updatedAt        DateTime       @default(dbgenerated("timezone('utc', now())")) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  application    Application    @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  type           DocumentType   @relation(fields: [documentType], references: [code])
+  verifiedBy     Profile?       @relation("DocumentVerifier", fields: [verifiedById], references: [id])
+  proofForDeposit DepositRecord[] @relation("DepositProof")
+  verifications  DocumentVerification[]
+
+  @@index([applicationId], map: "documents_application_id_idx")
+  @@map("documents")
+}
+
+model DepositRecord {
+  id                 String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  applicationId      String        @unique @map("application_id") @db.Uuid
+  amount             Decimal       @default(100000) @db.Decimal
+  currency           String        @default("TZS")
+  status             DepositStatus @default(PENDING)
+  reference          String?
+  proofDocumentId    String?       @map("proof_document_id") @db.Uuid
+  verifiedById       String?       @map("verified_by") @db.Uuid
+  verifiedAt         DateTime?     @map("verified_at") @db.Timestamptz(6)
+  verificationNote   String?       @map("verification_note")
+  createdAt          DateTime      @default(dbgenerated("timezone('utc', now())")) @map("created_at") @db.Timestamptz(6)
+  updatedAt          DateTime      @default(dbgenerated("timezone('utc', now())")) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  application   Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  proofDocument Document?   @relation("DepositProof", fields: [proofDocumentId], references: [id])
+  verifiedBy    Profile?    @relation("DepositVerifier", fields: [verifiedById], references: [id])
+
+  @@map("deposit_records")
+}
+
+model StatusHistory {
+  id            String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  applicationId String     @map("application_id") @db.Uuid
+  oldStatus     AppStatus? @map("old_status")
+  newStatus     AppStatus  @map("new_status")
+  changedById   String?    @map("changed_by") @db.Uuid
+  note          String?
+  createdAt     DateTime   @default(dbgenerated("timezone('utc', now())")) @map("created_at") @db.Timestamptz(6)
+
+  application Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  changedBy   Profile?    @relation(fields: [changedById], references: [id])
+
+  @@index([applicationId, createdAt(sort: Desc)], map: "status_history_application_id_idx")
+  @@map("status_history")
+}
+
+model CorrectionRequest {
+  id            String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  applicationId String    @map("application_id") @db.Uuid
+  requestedById String    @map("requested_by") @db.Uuid
+  summary       String
+  resolvedAt    DateTime? @map("resolved_at") @db.Timestamptz(6)
+  createdAt     DateTime  @default(dbgenerated("timezone('utc', now())")) @map("created_at") @db.Timestamptz(6)
+
+  application Application       @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  requestedBy Profile           @relation(fields: [requestedById], references: [id])
+  items       CorrectionItem[]
+
+  @@map("correction_requests")
+}
+
+model CorrectionItem {
+  id                   String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  correctionRequestId  String             @map("correction_request_id") @db.Uuid
+  kind                 CorrectionItemKind
+  target               String
+  reason               String
+  resolvedAt           DateTime?          @map("resolved_at") @db.Timestamptz(6)
+
+  request CorrectionRequest @relation(fields: [correctionRequestId], references: [id], onDelete: Cascade)
+
+  @@map("correction_items")
+}
+
+model Notification {
+  id         String               @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId     String               @map("user_id") @db.Uuid
+  category   NotificationCategory
+  title      String
+  message    String
+  entityType String?              @map("entity_type")
+  entityId   String?              @map("entity_id") @db.Uuid
+  readAt     DateTime?            @map("read_at") @db.Timestamptz(6)
+  createdAt  DateTime             @default(dbgenerated("timezone('utc', now())")) @map("created_at") @db.Timestamptz(6)
+
+  user Profile @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("notifications")
+}
+
+model AuditLog {
+  id         String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  actorId    String?       @map("actor_id") @db.Uuid
+  actorRole  String?       @map("actor_role")
+  category   AuditCategory
+  severity   AuditSeverity @default(info)
+  action     String
+  detail     String        @default("")
+  entityType String?       @map("entity_type")
+  entityId   String?       @map("entity_id") @db.Uuid
+  target     String?
+  ipAddress  String?       @map("ip_address") @db.Inet
+  metadata   Json          @default("{}")
+  createdAt  DateTime      @default(dbgenerated("timezone('utc', now())")) @map("created_at") @db.Timestamptz(6)
+
+  actor Profile? @relation(fields: [actorId], references: [id])
+
+  @@index([createdAt(sort: Desc)], map: "audit_logs_created_at_idx")
+  @@index([category], map: "audit_logs_category_idx")
+  @@map("audit_logs")
+}
+
+enum VerificationReviewStatus {
+  pending
+  flagged
+  approved
+  dismissed
+
+  @@map("verification_review_status")
+}
+
+model DocumentVerification {
+  id             String                   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  documentId     String                   @map("document_id") @db.Uuid
+  userId         String                   @map("user_id") @db.Uuid
+  applicationId  String                   @map("application_id") @db.Uuid
+  documentType   String                   @map("document_type")
+  passed         Boolean                  @default(false)
+  issues         String[]                 @default([])
+  extracted      Json                     @default("{}")
+  quality        Json                     @default("{}")
+  confidence     Decimal                  @default(0) @db.Decimal
+  provider       String?
+  authenticity   Json                     @default("{}")
+  reviewStatus   VerificationReviewStatus @default(pending) @map("review_status")
+  reviewedById   String?                  @map("reviewed_by") @db.Uuid
+  reviewedAt     DateTime?                @map("reviewed_at") @db.Timestamptz(6)
+  createdAt      DateTime                 @default(dbgenerated("timezone('utc', now())")) @map("created_at") @db.Timestamptz(6)
+
+  document   Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  user       Profile  @relation("VerificationSubject", fields: [userId], references: [id], onDelete: Cascade)
+  reviewer   Profile? @relation("VerificationReviewer", fields: [reviewedById], references: [id])
+
+  @@index([documentId, createdAt(sort: Desc)], map: "document_verifications_document_id_idx")
+  @@index([reviewStatus, createdAt(sort: Desc)], map: "document_verifications_review_status_idx")
+  @@map("document_verifications")
+}

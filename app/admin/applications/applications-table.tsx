@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import Link from "next/link"
 import { Search, SlidersHorizontal, ChevronLeft, ChevronRight } from "lucide-react"
 import { Input } from "@/components/ui/input"
@@ -14,7 +14,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { AppStatusBadge, DepositStatusBadge } from "@/components/admin/status-badge"
-import { applications, computeCaseHealth, statusLabels, type AppStatus, type HealthTone } from "@/lib/admin-data"
+import { computeCaseHealth, statusLabels, type Application, type AppStatus, type HealthTone } from "@/lib/domain"
 import { cn } from "@/lib/utils"
 
 const statusOptions: AppStatus[] = [
@@ -35,15 +35,26 @@ const healthMeta: Record<HealthTone, { label: string; className: string }> = {
   neutral: { label: "In progress", className: "bg-accent" },
 }
 
-export function ApplicationsTable() {
-  const [query, setQuery] = useState("")
+export function ApplicationsTable({
+  applications,
+  initialQuery = "",
+}: {
+  applications: Application[]
+  initialQuery?: string
+}) {
+  const [query, setQuery] = useState(initialQuery)
   const [status, setStatus] = useState<string>("all")
   const [channel, setChannel] = useState<string>("all")
   const [sector, setSector] = useState<string>("all")
   const [page, setPage] = useState(1)
 
-  const channels = useMemo(() => Array.from(new Set(applications.map((a) => a.channel))), [])
-  const sectors = useMemo(() => Array.from(new Set(applications.map((a) => a.sector))), [])
+  useEffect(() => {
+    setQuery(initialQuery)
+    setPage(1)
+  }, [initialQuery])
+
+  const channels = useMemo(() => Array.from(new Set(applications.map((a) => a.channel).filter(Boolean))), [applications])
+  const sectors = useMemo(() => Array.from(new Set(applications.map((a) => a.sector).filter(Boolean))), [applications])
 
   const filtered = useMemo(() => {
     return applications.filter((app) => {
@@ -51,13 +62,14 @@ export function ApplicationsTable() {
         query.trim() === "" ||
         app.appNumber.toLowerCase().includes(query.toLowerCase()) ||
         app.agentName.toLowerCase().includes(query.toLowerCase()) ||
-        app.phone.includes(query)
+        app.phone.includes(query) ||
+        app.idNumber.toLowerCase().includes(query.toLowerCase())
       const matchesStatus = status === "all" || app.status === status
       const matchesChannel = channel === "all" || app.channel === channel
       const matchesSector = sector === "all" || app.sector === sector
       return matchesQuery && matchesStatus && matchesChannel && matchesSector
     })
-  }, [query, status, channel, sector])
+  }, [query, status, channel, sector, applications])
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))
   const paged = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)

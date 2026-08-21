@@ -134,6 +134,14 @@
   * {
     @apply border-border outline-ring/50;
   }
+  html,
+  body {
+    margin: 0;
+    padding: 0;
+    width: 100%;
+    height: 100dvh;
+    overflow: hidden;
+  }
   html {
     @apply bg-background;
   }
@@ -154,6 +162,14 @@
 }
 
 @layer components {
+  .app-shell {
+    display: flex;
+    width: 100%;
+    height: 100dvh;
+    overflow: hidden;
+    border-radius: 1.75rem;
+  }
+
   .portal-page {
     @apply mx-auto flex w-full max-w-[1440px] flex-col gap-6 p-4 sm:p-6 lg:p-8;
   }

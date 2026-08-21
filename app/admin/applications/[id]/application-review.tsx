@@ -15,10 +15,10 @@ import {
   ImageOff,
   CheckCircle2,
   XCircle,
-  AlertTriangle,
   ClipboardList,
   FileCheck2,
   Wallet,
+  Upload,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
@@ -48,54 +48,113 @@ import { CaseHealthCard } from "@/components/case-health-card"
 import { DetailField } from "@/components/admin/detail-field"
 import {
   buildDocumentFileName,
-  formatCurrencyTZS,
   getDocumentFile,
   statusLabels,
   type Application,
   type AppStatus,
   type Document,
-} from "@/lib/admin-data"
+  type DuplicateMatch,
+} from "@/lib/domain"
+import { formatCurrencyTZS } from "@/lib/format"
 import { downloadFile } from "@/lib/download"
+import { formatDateLong, formatGps, formatPhoneTZ } from "@/lib/format"
 import { cn } from "@/lib/utils"
+import { useRouter } from "next/navigation"
+import { copyAllPayload } from "@/lib/actions/export"
+import { updateStatus, requestCorrection } from "@/lib/actions/applications"
+import { verifyDocument, rejectDocument, signedGet } from "@/lib/actions/documents"
+import { DocumentUploadDialog } from "@/components/documents/document-upload-dialog"
+import { DocumentRejectDialog } from "@/components/documents/document-reject-dialog"
+import { DocumentStatusLabel } from "@/components/admin/status-badge"
+import { verifyDeposit } from "@/lib/actions/deposits"
 
 function buildCopyAllDetails(app: Application) {
   return [
     `Agent Name: ${app.agentName}`,
-    `Registered Phone: ${app.phone}`,
+    `Registered Phone: ${formatPhoneTZ(app.phone)}`,
     `Business Sector: ${app.sector}`,
     `Channel: ${app.channel}`,
     `ID Type: ${app.idType}`,
     `ID Number: ${app.idNumber}`,
-    `TIN: ${app.documents.find((d) => d.type === "tin") ? app.idNumber.slice(0, 9) : "—"}`,
+    `TIN: ${app.tinNumber ?? ""}`,
     `Country: ${app.country}`,
     `Region: ${app.province}`,
     `District: ${app.district}`,
     `Ward: ${app.ward}`,
     `Location: ${app.street}, ${app.houseNumber}`,
-    `Latitude: ${app.lat}`,
-    `Longitude: ${app.lng}`,
+    `Latitude: ${app.lat?.toFixed?.(4) ?? app.lat}`,
+    `Longitude: ${app.lng?.toFixed?.(4) ?? app.lng}`,
   ].join("\n")
 }
 
 const reviewStatuses: AppStatus[] = ["PENDING_REVIEW", "IN_PROGRESS", "NEEDS_CORRECTION", "COMPLETED", "REJECTED"]
 
-export function ApplicationReview({ application }: { application: Application }) {
+const matchLabels: Record<DuplicateMatch["matches"][number], string> = {
+  phone: "phone",
+  id: "ID number",
+  tin: "TIN",
+}
+
+export function ApplicationReview({
+  application,
+  live,
+  duplicates = [],
+}: {
+  application: Application
+  live?: boolean
+  duplicates?: DuplicateMatch[]
+}) {
+  const router = useRouter()
   const [activeDocId, setActiveDocId] = useState(application.documents[0]?.id)
   const [status, setStatus] = useState<AppStatus>(application.status)
   const [copiedAll, setCopiedAll] = useState(false)
+  const [copiedShare, setCopiedShare] = useState(false)
   const [correctionNote, setCorrectionNote] = useState("")
-  const [documentStatuses, setDocumentStatuses] = useState<Record<string, "verified" | "rejected">>({})
+  const [rejectionNote, setRejectionNote] = useState("Application does not meet onboarding requirements.")
+  const [documentStatuses, setDocumentStatuses] = useState<Record<string, Document["status"]>>({})
+  const [error, setError] = useState<string | null>(null)
+  const [busy, setBusy] = useState(false)
+  const [docs, setDocs] = useState(application.documents)
+  const [uploadOpen, setUploadOpen] = useState(false)
+  const [rejectOpen, setRejectOpen] = useState(false)
 
-  const activeDoc = application.documents.find((d) => d.id === activeDocId) ?? application.documents[0]
+  const activeDoc = docs.find((d) => d.id === activeDocId) ?? docs[0]
   const activeDocStatus = activeDoc ? documentStatuses[activeDoc.id] ?? activeDoc.status : "missing"
 
-  const updateDocumentStatus = (nextStatus: "verified" | "rejected") => {
+  const refresh = () => router.refresh()
+
+  const updateDocumentStatus = async (nextStatus: "verified" | "rejected", reason?: string) => {
     if (!activeDoc) return
     setDocumentStatuses((current) => ({ ...current, [activeDoc.id]: nextStatus }))
+    setDocs((current) =>
+      current.map((doc) =>
+        doc.id === activeDoc.id ? { ...doc, status: nextStatus, reason: reason ?? doc.reason } : doc,
+      ),
+    )
+    if (!live) return
+    setBusy(true)
+    setError(null)
+    try {
+      if (nextStatus === "verified") await verifyDocument(activeDoc.id)
+      else await rejectDocument(activeDoc.id, reason?.trim() || "Please re-upload this document")
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not update document")
+    } finally {
+      setBusy(false)
+    }
   }
 
-  const handleDownloadDocument = (doc?: Document) => {
+  const handleDownloadDocument = async (doc?: Document) => {
     if (!doc) return
+    if (live) {
+      try {
+        const signed = await signedGet(doc.id, "attachment")
+        void downloadFile(signed.getUrl, signed.filename ?? `${doc.name}.png`)
+        return
+      } catch {
+        // fall through
+      }
+    }
     const file = getDocumentFile(doc)
     if (!file) return
     const filename = buildDocumentFileName({
@@ -109,7 +168,8 @@ export function ApplicationReview({ application }: { application: Application })
 
   const handleCopyAll = async () => {
     try {
-      await navigator.clipboard.writeText(buildCopyAllDetails(application))
+      const text = live ? await copyAllPayload(application.id) : buildCopyAllDetails(application)
+      await navigator.clipboard.writeText(text)
       setCopiedAll(true)
       setTimeout(() => setCopiedAll(false), 1800)
     } catch {
@@ -117,8 +177,46 @@ export function ApplicationReview({ application }: { application: Application })
     }
   }
 
+  const handleShare = async () => {
+    const url = window.location.href
+    try {
+      if (navigator.share) {
+        await navigator.share({ title: application.appNumber, url })
+        return
+      }
+      await navigator.clipboard.writeText(url)
+      setCopiedShare(true)
+      setTimeout(() => setCopiedShare(false), 1800)
+    } catch {
+      try {
+        await navigator.clipboard.writeText(url)
+        setCopiedShare(true)
+        setTimeout(() => setCopiedShare(false), 1800)
+      } catch {
+        // share/clipboard unavailable
+      }
+    }
+  }
+
+  const changeStatus = async (next: AppStatus, note?: string) => {
+    setStatus(next)
+    if (!live) return
+    setBusy(true)
+    setError(null)
+    try {
+      await updateStatus(application.id, next, note)
+      refresh()
+    } catch (err) {
+      setStatus(application.status)
+      setError(err instanceof Error ? err.message : "Could not update status")
+    } finally {
+      setBusy(false)
+    }
+  }
+
   return (
-    <div className="mx-auto flex max-w-[1400px] flex-col gap-6 p-4 pb-28 md:p-6">
+    <div className="absolute inset-0 flex min-h-0 flex-col">
+      <div className="mx-auto flex min-h-0 w-full max-w-[1400px] flex-1 flex-col gap-6 overflow-y-auto p-4 md:p-6">
       <div className="flex flex-col gap-3">
         <Link
           href="/admin/applications"
@@ -152,19 +250,44 @@ export function ApplicationReview({ application }: { application: Application })
             </div>
           </div>
           <div className="flex gap-2">
-            <Button variant="outline">
+            <Button variant="outline" onClick={() => window.print()}>
               <Printer data-icon="inline-start" />
               Print
             </Button>
-            <Button>
+            <Button onClick={() => void handleShare()}>
               <Share2 data-icon="inline-start" />
-              Share
+              {copiedShare ? "Link copied" : "Share"}
             </Button>
           </div>
         </div>
       </div>
 
       <CaseHealthCard application={application} showNextAction={false} />
+
+      {duplicates.length > 0 && (
+        <div className="rounded-lg border border-warning/40 bg-warning/10 px-5 py-4">
+          <p className="text-sm font-semibold text-warning-foreground">Possible duplicate applications</p>
+          <p className="mt-1 text-sm text-warning-foreground/80">
+            Matching phone, ID number, or TIN already exists on another case. Review before completing onboarding.
+          </p>
+          <ul className="mt-3 flex flex-col gap-2">
+            {duplicates.map((dup) => (
+              <li key={dup.id}>
+                <Link
+                  href={`/admin/applications/${dup.id}`}
+                  className="text-sm font-medium text-foreground underline-offset-4 hover:underline"
+                >
+                  {dup.appNumber}
+                </Link>
+                <span className="text-sm text-muted-foreground">
+                  {" "}
+                  · {statusLabels[dup.status]} · same {dup.matches.map((match) => matchLabels[match]).join(", ")}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_320px]">
         <div className="flex flex-col gap-6">
@@ -177,28 +300,21 @@ export function ApplicationReview({ application }: { application: Application })
               <DetailField label="Channel Parent Name" value={application.channelParentName} />
               <DetailField label="Channel Manager Type" value={application.channelManagerType} />
               <DetailField label="Channel Manager Name" value={application.channelManagerName} />
-              <DetailField label="Channel Type" value={application.channelType} />
-              <DetailField label="Phone Number" value={application.phone} mono />
-              <DetailField label="Channel Name" value={application.channel} />
+              <DetailField label="Channel Tier" value={application.channelType} />
+              <DetailField label="Phone Number" value={formatPhoneTZ(application.phone)} mono />
+              <DetailField label="Channel Name" value={application.businessName ?? application.channel} />
               <DetailField label="ID Type" value={application.idType} />
               <DetailField label="ID Number" value={application.idNumber} mono />
               <DetailField label="Issued Place" value={application.issuedPlace} />
-              <DetailField
-                label="Issued Date"
-                value={new Date(application.issuedDate).toLocaleDateString("en-GB", {
-                  day: "2-digit",
-                  month: "short",
-                  year: "numeric",
-                })}
-              />
+              <DetailField label="Issued Date" value={formatDateLong(application.issuedDate)} />
               <DetailField
                 label="Expire Date"
-                value={new Date(application.expireDate).toLocaleDateString("en-GB", {
-                  day: "2-digit",
-                  month: "short",
-                  year: "numeric",
-                })}
-                warning={new Date(application.expireDate) < new Date(Date.now() + 90 * 86400000) ? "Expires Soon" : undefined}
+                value={formatDateLong(application.expireDate)}
+                warning={
+                  application.expireDate && new Date(application.expireDate) < new Date(Date.now() + 90 * 86400000)
+                    ? "Expires Soon"
+                    : undefined
+                }
               />
             </div>
           </section>
@@ -221,7 +337,7 @@ export function ApplicationReview({ application }: { application: Application })
               <div className="flex items-center gap-2 text-sm text-foreground">
                 <MapPin className="size-4 text-muted-foreground" />
                 <span className="font-mono text-muted-foreground">
-                  Lat: {application.lat}, Lng: {application.lng}
+                  {formatGps(application.lat, application.lng)}
                 </span>
               </div>
               <Button variant="outline" size="sm">
@@ -238,20 +354,67 @@ export function ApplicationReview({ application }: { application: Application })
             <div className="grid grid-cols-1 gap-x-8 gap-y-5 p-5 sm:grid-cols-3">
               <DetailField label="Required Amount" value={formatCurrencyTZS(application.depositAmount)} mono />
               <DetailField label="Reference" value={application.depositReference ?? "Not provided"} mono />
-              <DetailField label="Status" value={statusLabels[status] === "Rejected" ? "Rejected" : application.depositStatus} />
+              <DetailField label="Status" value={application.depositStatus} />
             </div>
+            {live && (
+              <div className="flex gap-2 border-t border-border px-5 py-3">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={busy || application.depositStatus === "REJECTED"}
+                  onClick={async () => {
+                    setBusy(true)
+                    setError(null)
+                    try {
+                      await verifyDeposit(application.id, "REJECTED", "Deposit proof was rejected")
+                      refresh()
+                    } catch (err) {
+                      setError(err instanceof Error ? err.message : "Could not reject deposit")
+                    } finally {
+                      setBusy(false)
+                    }
+                  }}
+                >
+                  Reject deposit
+                </Button>
+                <Button
+                  size="sm"
+                  disabled={busy || application.depositStatus === "CLEARED"}
+                  onClick={async () => {
+                    setBusy(true)
+                    setError(null)
+                    try {
+                      await verifyDeposit(application.id, "CLEARED")
+                      refresh()
+                    } catch (err) {
+                      setError(err instanceof Error ? err.message : "Could not verify deposit")
+                    } finally {
+                      setBusy(false)
+                    }
+                  }}
+                >
+                  Verify deposit
+                </Button>
+              </div>
+            )}
           </section>
 
           <section className="overflow-hidden rounded-lg border border-border bg-card">
             <header className="flex items-center justify-between gap-2 border-b border-border px-5 py-4">
               <span className="text-base font-semibold text-foreground">Supporting Documents</span>
-              <span className="rounded-md bg-secondary px-2 py-1 text-xs font-medium text-muted-foreground">
-                {application.documents.length} Files
-              </span>
+              <div className="flex items-center gap-2">
+                <span className="rounded-md bg-secondary px-2 py-1 text-xs font-medium text-muted-foreground">
+                  {docs.length} Files
+                </span>
+                <Button size="sm" onClick={() => setUploadOpen(true)}>
+                  <Upload data-icon="inline-start" />
+                  Upload Document
+                </Button>
+              </div>
             </header>
             <div className="grid grid-cols-1 sm:grid-cols-[220px_1fr]">
               <ul className="flex flex-row overflow-x-auto border-b border-border sm:flex-col sm:overflow-visible sm:border-b-0 sm:border-r">
-                {application.documents.map((doc) => (
+                {docs.map((doc) => (
                   <li key={doc.id} className="shrink-0 sm:shrink">
                     <button
                       type="button"
@@ -272,16 +435,11 @@ export function ApplicationReview({ application }: { application: Application })
                       </span>
                       <span className="min-w-0">
                         <span className="block truncate text-sm font-medium text-foreground">{doc.name}</span>
-                        <span
-                          className={cn(
-                            "block text-xs font-medium",
-                            doc.status === "verified" && "text-success",
-                            doc.status === "unverified" && "text-warning-foreground",
-                            doc.status === "missing" && "text-destructive",
-                          )}
-                        >
-                          {doc.status === "verified" ? "Verified" : doc.status === "unverified" ? "Unverified" : "Missing"}
-                        </span>
+                        <DocumentStatusLabel
+                          status={documentStatuses[doc.id] ?? doc.status}
+                          required={doc.required}
+                          className="block"
+                        />
                       </span>
                     </button>
                   </li>
@@ -293,8 +451,8 @@ export function ApplicationReview({ application }: { application: Application })
                   <Button
                     variant="outline"
                     size="sm"
-                    disabled={!getDocumentFile(activeDoc ?? ({} as Document))}
-                    onClick={() => handleDownloadDocument(activeDoc)}
+                    disabled={!live && !getDocumentFile(activeDoc ?? ({} as Document))}
+                    onClick={() => void handleDownloadDocument(activeDoc)}
                   >
                     <Download data-icon="inline-start" />
                     Download
@@ -326,29 +484,37 @@ export function ApplicationReview({ application }: { application: Application })
                     <p className="text-sm font-semibold text-foreground">{activeDoc?.name}</p>
                     <p className="text-xs text-muted-foreground">
                       {activeDocStatus === "verified"
-                        ? `Verified${activeDoc?.verifiedBy ? ` by ${activeDoc.verifiedBy}` : " in this review"}`
+                        ? `Approved${activeDoc?.verifiedBy ? ` by registry staff` : " in this review"}`
                         : activeDocStatus === "rejected"
-                          ? activeDoc?.reason ?? "Marked for correction in this review"
-                          : "Awaiting document review"}
+                          ? activeDoc?.reason ?? "Re-upload requested"
+                          : activeDocStatus === "missing"
+                            ? "Required — not yet uploaded"
+                            : "Pending registry review"}
                     </p>
                   </div>
-                  {activeDocStatus !== "missing" && (
-                    <div className="flex gap-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => updateDocumentStatus("rejected")}
-                        className="text-destructive hover:text-destructive"
-                      >
-                        <XCircle data-icon="inline-start" />
-                        Reject
-                      </Button>
-                      <Button size="sm" onClick={() => updateDocumentStatus("verified")}>
-                        <CheckCircle2 data-icon="inline-start" />
-                        Verify
-                      </Button>
-                    </div>
-                  )}
+                  <div className="flex gap-2">
+                    {activeDocStatus !== "missing" && (
+                      <>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setRejectOpen(true)}
+                          className="text-destructive hover:text-destructive"
+                        >
+                          <XCircle data-icon="inline-start" />
+                          Request re-upload
+                        </Button>
+                        <Button size="sm" disabled={busy} onClick={() => void updateDocumentStatus("verified")}>
+                          <CheckCircle2 data-icon="inline-start" />
+                          Approve
+                        </Button>
+                      </>
+                    )}
+                    <Button size="sm" variant="outline" onClick={() => setUploadOpen(true)}>
+                      <Upload data-icon="inline-start" />
+                      {activeDocStatus === "rejected" ? "Re-upload" : "Upload"}
+                    </Button>
+                  </div>
                 </div>
               </div>
             </div>
@@ -363,7 +529,7 @@ export function ApplicationReview({ application }: { application: Application })
 
           <div className="rounded-lg border border-border bg-card p-4">
             <p className="mb-2 text-xs font-medium tracking-wide text-muted-foreground uppercase">Review Status</p>
-            <Select value={status} onValueChange={(v) => setStatus(v as AppStatus)}>
+            <Select value={status} onValueChange={(v) => void changeStatus(v as AppStatus)}>
               <SelectTrigger className="w-full">
                 <SelectValue />
               </SelectTrigger>
@@ -398,7 +564,23 @@ export function ApplicationReview({ application }: { application: Application })
                 </Field>
                 <DialogFooter>
                   <Button
-                    onClick={() => {
+                    disabled={busy || correctionNote.trim().length < 3}
+                    onClick={async () => {
+                      if (live) {
+                        setBusy(true)
+                        setError(null)
+                        try {
+                          await requestCorrection(application.id, correctionNote, [
+                            { kind: "field", target: "application", reason: correctionNote },
+                          ])
+                          refresh()
+                        } catch (err) {
+                          setError(err instanceof Error ? err.message : "Could not request correction")
+                          setBusy(false)
+                          return
+                        }
+                        setBusy(false)
+                      }
                       setStatus("NEEDS_CORRECTION")
                       setCorrectionNote("")
                     }}
@@ -432,10 +614,16 @@ export function ApplicationReview({ application }: { application: Application })
           </div>
         </aside>
       </div>
+    </div>
 
-      <div className="fixed inset-x-0 bottom-0 z-30 border-t border-border bg-card/95 backdrop-blur md:left-64">
-        <div className="mx-auto flex max-w-[1400px] flex-col items-center gap-3 px-4 py-3 sm:flex-row sm:justify-between md:px-6">
-          <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
+      <div
+        role="region"
+        aria-label="Application actions"
+        className="relative z-20 shrink-0 px-3 pt-2 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:px-4 md:px-6"
+      >
+        <div className="mx-auto flex max-w-[1400px] flex-col items-stretch gap-3 rounded-2xl border border-border bg-card p-3 shadow-lg sm:flex-row sm:items-center sm:justify-between sm:px-4">
+          <div className="flex min-w-0 flex-wrap items-center gap-2 text-sm text-muted-foreground sm:gap-3">
+            {error && <span className="text-destructive">{error}</span>}
             <span>
               Viewing <span className="font-mono font-medium text-foreground">{application.appNumber}</span>
             </span>
@@ -446,10 +634,10 @@ export function ApplicationReview({ application }: { application: Application })
               {application.documents.filter((d) => d.status === "verified").length} of {application.documents.length} docs verified
             </span>
           </div>
-          <div className="flex gap-2">
+          <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:flex-wrap sm:justify-end">
             <AlertDialog>
               <AlertDialogTrigger
-                render={<Button variant="outline" className="text-destructive hover:text-destructive" />}
+                render={<Button variant="outline" className="w-full text-destructive hover:text-destructive sm:w-auto" />}
               >
                 Reject Application
               </AlertDialogTrigger>
@@ -458,18 +646,25 @@ export function ApplicationReview({ application }: { application: Application })
                   <AlertDialogTitle>Reject this application?</AlertDialogTitle>
                   <AlertDialogDescription>
                     This will mark {application.appNumber} as rejected and notify the agent. This action is recorded in the
-                    audit timeline and can be reversed by a Super Admin.
+                    audit timeline.
                   </AlertDialogDescription>
                 </AlertDialogHeader>
+                <Textarea
+                  value={rejectionNote}
+                  onChange={(e) => setRejectionNote(e.target.value)}
+                  placeholder="Rejection reason"
+                  rows={3}
+                  className="mx-6 mb-2"
+                />
                 <AlertDialogFooter>
                   <AlertDialogCancel>Cancel</AlertDialogCancel>
-                  <AlertDialogAction onClick={() => setStatus("REJECTED")}>Reject Application</AlertDialogAction>
+                  <AlertDialogAction onClick={() => void changeStatus("REJECTED", rejectionNote)}>Reject Application</AlertDialogAction>
                 </AlertDialogFooter>
               </AlertDialogContent>
             </AlertDialog>
 
             <AlertDialog>
-              <AlertDialogTrigger render={<Button />}>Approve Application</AlertDialogTrigger>
+              <AlertDialogTrigger render={<Button className="w-full sm:w-auto" />}>Approve Application</AlertDialogTrigger>
               <AlertDialogContent>
                 <AlertDialogHeader>
                   <AlertDialogTitle>Approve this application?</AlertDialogTitle>
@@ -480,13 +675,33 @@ export function ApplicationReview({ application }: { application: Application })
                 </AlertDialogHeader>
                 <AlertDialogFooter>
                   <AlertDialogCancel>Cancel</AlertDialogCancel>
-                  <AlertDialogAction onClick={() => setStatus("COMPLETED")}>Approve Application</AlertDialogAction>
+                  <AlertDialogAction onClick={() => void changeStatus("COMPLETED", "Application approved")}>Approve Application</AlertDialogAction>
                 </AlertDialogFooter>
               </AlertDialogContent>
             </AlertDialog>
           </div>
         </div>
       </div>
+      <DocumentUploadDialog
+        open={uploadOpen}
+        onOpenChange={setUploadOpen}
+        applicationId={application.id}
+        documents={docs}
+        initialType={activeDoc?.type}
+        live={live}
+        onComplete={(next) => {
+          setDocs(next)
+          const latest = next.find((doc) => doc.type === activeDoc?.type) ?? next[0]
+          if (latest) setActiveDocId(latest.id)
+        }}
+      />
+      <DocumentRejectDialog
+        open={rejectOpen}
+        onOpenChange={setRejectOpen}
+        documentName={activeDoc?.name}
+        busy={busy}
+        onConfirm={(reason) => updateDocumentStatus("rejected", reason)}
+      />
     </div>
   )
 }

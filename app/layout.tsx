@@ -8,12 +8,15 @@ import './globals.css'
 const manrope = Manrope({
   subsets: ['latin'],
   variable: '--font-manrope',
+  display: 'swap',
 })
 
 const ibmPlexMono = IBM_Plex_Mono({
   subsets: ['latin'],
   weight: ['400', '500', '600'],
   variable: '--font-ibm-plex-mono',
+  display: 'swap',
+  preload: false,
 })
 
 export const metadata: Metadata = {
@@ -52,8 +55,8 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   return (
-    <html lang="en" className={`${manrope.variable} ${ibmPlexMono.variable} bg-background`}>
-      <body className="font-sans antialiased">
+    <html lang="en" className={`${manrope.variable} ${ibmPlexMono.variable} h-dvh bg-background`}>
+      <body className="m-0 h-dvh w-full overflow-hidden p-0 font-sans antialiased">
         <AuthProvider>
           <TooltipProvider delay={150}>{children}</TooltipProvider>
         </AuthProvider>

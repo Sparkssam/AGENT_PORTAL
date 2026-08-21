@@ -14,7 +14,7 @@ export function AuthShell({
   footer?: React.ReactNode
 }) {
   return (
-    <div className="flex min-h-screen items-center justify-center bg-secondary/40 p-3 sm:p-4">
+    <div className="flex h-dvh items-center justify-center overflow-y-auto bg-secondary/40 p-3 sm:p-4">
       <div className="grid w-full max-w-4xl overflow-hidden rounded-2xl border border-border bg-card shadow-xl shadow-foreground/5 md:grid-cols-[1fr_1fr]">
         <div className="flex flex-col justify-center px-6 py-7 sm:px-8">
           <div className="mb-5 flex items-center gap-2">

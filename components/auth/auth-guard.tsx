@@ -20,9 +20,9 @@ export function AuthGuard({ role, children }: { role: UserRole; children: React.
     }
   }, [loading, user, role, router])
 
-  if (loading || !user || user.role !== role) {
+  if (!loading && (!user || user.role !== role)) {
     return (
-      <div className="flex h-screen w-full items-center justify-center bg-background">
+      <div className="flex h-dvh w-full items-center justify-center bg-background">
         <Loader2 className="size-6 animate-spin text-muted-foreground" />
       </div>
     )

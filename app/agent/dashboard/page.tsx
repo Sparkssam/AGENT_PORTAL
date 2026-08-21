@@ -1,182 +1,228 @@
 import Link from "next/link"
-import {
-  ArrowRight,
-  BadgeCheck,
-  FileText,
-  FolderOpen,
-  Headset,
-  UserRound,
-  Wallet,
-  CheckCircle2,
-  Circle,
-  Upload,
-} from "lucide-react"
+import { ArrowRight, BadgeCheck, FileText, Headset, UserRound, Wallet } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { AppStatusBadge } from "@/components/admin/status-badge"
-import { CaseHealthCard } from "@/components/case-health-card"
-import { currentAgent, currentApplication, documentChecklistProgress, recentAgentActivity } from "@/lib/agent-data"
+import { AppStatusBadge, DepositStatusBadge } from "@/components/admin/status-badge"
+import { loadAgentWorkspace, isNewApplicant } from "@/lib/data/workspace"
+import { SetupBanner } from "@/components/setup-banner"
+import { formatCurrencyTZS, formatDateLong, formatDateTime, formatPhoneTZ } from "@/lib/format"
+import { computeCaseHealth } from "@/lib/domain"
+import { isClosedStatus, isInReviewStatus } from "@/lib/backend/status"
+import { AgentDocumentChecklist } from "./document-checklist"
+import { redirect } from "next/navigation"
 
 const quickLinks = [
-  { href: "/agent/applications", label: "My Applications", icon: FileText, available: true },
-  { href: "/agent/documents", label: "Documents", icon: FolderOpen, available: true },
+  { href: "/agent/applications", label: "Applications", icon: FileText, available: true },
   { href: "/agent/profile", label: "Profile", icon: UserRound, available: true },
+  { href: "/agent/help", label: "Support", icon: Headset, available: true },
   { href: "/agent/wallet", label: "Wallet", icon: Wallet, available: false },
 ]
 
-export default function AgentDashboardPage() {
-  const checklist = documentChecklistProgress(currentApplication.documents)
-  const memberSince = new Date(currentAgent.memberSince).toLocaleDateString("en-US", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-  })
+export default async function AgentDashboardPage() {
+  const { mode, message, agent: currentAgent, application: currentApplication, applications } =
+    await loadAgentWorkspace()
+  if (mode === "live" && isNewApplicant(applications) && currentAgent.lifecycleStatus !== "Suspended") {
+    redirect("/agent/apply")
+  }
+  const memberSince = formatDateLong(currentAgent.memberSince)
+  const completed = currentApplication.status === "COMPLETED"
+  const inReview = isInReviewStatus(currentApplication.status)
+  const closed = isClosedStatus(currentApplication.status)
+  const suspended = currentAgent.lifecycleStatus === "Suspended"
+  const depositDate = formatDateLong(currentApplication.depositVerifiedAt || currentApplication.submittedAt, "local")
+  const health = computeCaseHealth(currentApplication)
+  const firstName = currentAgent.fullName.split(" ")[0] || "there"
 
   return (
-    <div className="mx-auto flex max-w-[1400px] flex-col gap-6 p-4 md:p-6">
+    <div className="mx-auto flex max-w-[1400px] flex-col gap-8 p-4 md:px-8 md:pb-10 md:pt-2">
+      <SetupBanner mode={mode} message={message} />
       <div>
-        <h1 className="text-2xl font-semibold tracking-tight text-balance text-foreground md:text-3xl">
-          Welcome back, {currentAgent.fullName.split(" ")[0]}.
+        <h1 className="flex items-center gap-3 font-semibold text-4xl tracking-tight text-foreground md:text-5xl">
+          <span className="h-8 w-1.5 rounded-full bg-accent" aria-hidden />
+          Overview
         </h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Manage your agency operations and track your application from one place.
+        <p className="mt-3 max-w-xl text-sm text-muted-foreground">
+          {inReview
+            ? `${firstName}, your application is with the review team. Track status, documents, and deposit below.`
+            : completed
+              ? `Welcome back, ${firstName}. Your case is ready for the next step.`
+              : `Welcome, ${firstName}. Finish your application and keep documents in one place.`}
         </p>
       </div>
 
-      {/* Agent ID card */}
-      <div className="relative overflow-hidden rounded-xl bg-sidebar p-6 text-sidebar-foreground md:p-7">
-        <div className="flex flex-col justify-between gap-6 md:flex-row md:items-center">
-          <div>
-            <p className="text-xs font-medium tracking-wider text-sidebar-foreground/50 uppercase">
-              Agent ID Number
-            </p>
-            <p className="mt-1 font-mono text-2xl font-semibold tracking-tight md:text-3xl">
-              {currentAgent.agentIdNumber}
-            </p>
-            <p className="mt-2 text-sm text-sidebar-foreground/60">Agent since {memberSince}</p>
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <AppStatusBadge status={currentApplication.status} className="bg-accent/20 text-accent" />
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
+        <section className="rounded-[1.75rem] bg-card p-6 shadow-sm ring-1 ring-border/60 lg:col-span-2 md:p-8">
+          <p className="font-semibold text-2xl text-foreground">Application</p>
+          <p className="mt-4 font-mono text-4xl font-semibold tracking-tight text-foreground md:text-5xl">
+            {currentAgent.agentIdNumber}
+          </p>
+          <div className="mt-3 flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
+            <span>Agent since {memberSince}</span>
             {currentAgent.verified && (
-              <span className="inline-flex items-center gap-1.5 rounded-md bg-success/20 px-2 py-1 text-[11px] font-semibold tracking-wide text-success uppercase">
+              <span className="inline-flex items-center gap-1 rounded-full bg-success/15 px-2 py-0.5 text-[11px] font-semibold tracking-wide text-success uppercase">
                 <BadgeCheck className="size-3.5" />
                 Verified
               </span>
             )}
           </div>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-        <div className="flex flex-col gap-6 lg:col-span-2">
-          <CaseHealthCard application={currentApplication} />
-
-          <div className="rounded-lg border border-border bg-card">
-            <div className="flex items-center justify-between border-b border-border px-5 py-4">
-              <h2 className="text-base font-semibold text-foreground">Document Checklist</h2>
-              <span className="text-sm text-muted-foreground">
-                {checklist.uploaded} of {checklist.total} uploaded
+          <div className="mt-6 flex flex-wrap items-center gap-2">
+            <AppStatusBadge status={currentApplication.status} />
+            <DepositStatusBadge status={currentApplication.depositStatus} />
+          </div>
+          <div className="mt-8">
+            <div className="mb-2 flex items-center justify-between text-sm">
+              <span className="font-medium text-foreground">Fields complete</span>
+              <span className="text-muted-foreground">
+                {health.fieldsComplete} of {health.fieldsTotal}
               </span>
             </div>
-            <div className="px-5 pt-4">
-              <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
-                <div
-                  className="h-full rounded-full bg-primary transition-all"
-                  style={{ width: `${checklist.percent}%` }}
-                />
-              </div>
+            <div className="h-2.5 overflow-hidden rounded-full bg-muted">
+              <div
+                className="h-full rounded-full bg-primary transition-all"
+                style={{ width: `${health.appPercent}%` }}
+              />
             </div>
-            <ul className="divide-y divide-border px-5">
-              {currentApplication.documents.map((doc) => (
-                <li key={doc.id} className="flex items-center gap-3 py-3.5">
-                  {doc.status === "missing" ? (
-                    <Circle className="size-4 shrink-0 text-muted-foreground/50" />
-                  ) : (
-                    <CheckCircle2 className="size-4 shrink-0 text-success" />
-                  )}
-                  <span className="text-sm text-foreground">{doc.name}</span>
-                  {doc.status === "missing" ? (
-                    <Button size="sm" variant="outline" className="ml-auto">
-                      <Upload data-icon="inline-start" />
-                      Upload
-                    </Button>
-                  ) : (
-                    <span className="ml-auto text-xs font-medium text-muted-foreground">Uploaded</span>
-                  )}
-                </li>
-              ))}
-            </ul>
-            <div className="border-t border-border p-4">
-              <Button variant="outline" size="sm" render={<Link href="/agent/documents" />} nativeButton={false}>
-                Manage documents
+            <div className="mt-3 flex flex-wrap gap-4 text-xs text-muted-foreground">
+              <span>
+                Documents {health.docsVerified}/{health.docsTotal} verified
+              </span>
+              <span>Deposit {formatCurrencyTZS(currentApplication.depositAmount)}</span>
+            </div>
+          </div>
+          <div className="mt-6">
+            {suspended ? (
+              <p className="text-sm text-muted-foreground">Account actions are paused while this agent is suspended.</p>
+            ) : (
+              <Button size="lg" nativeButton={false} render={<Link href={health.nextAction.href} />}>
+                {health.nextAction.label}
                 <ArrowRight data-icon="inline-end" />
               </Button>
-            </div>
+            )}
           </div>
+        </section>
 
-          <div className="rounded-lg border border-border bg-card">
-            <div className="border-b border-border px-5 py-4">
-              <h2 className="text-base font-semibold text-foreground">Recent Activity</h2>
-            </div>
-            <ul className="flex flex-col divide-y divide-border">
-              {recentAgentActivity.map((event) => (
-                <li key={event.id} className="flex items-start justify-between gap-3 px-5 py-4">
-                  <p className="text-sm text-foreground">
-                    <span className="font-medium">{event.actor}</span> {event.action}
-                    {event.detail ? ` · ${event.detail}` : ""}
-                  </p>
-                  <span className="shrink-0 text-xs text-muted-foreground">{event.timestamp}</span>
-                </li>
-              ))}
-            </ul>
+        <section className="rounded-[1.75rem] bg-card p-6 shadow-sm ring-1 ring-border/60">
+          <div className="flex items-center justify-between">
+            <p className="font-semibold text-2xl text-foreground">Status</p>
+            <Link href="/agent/applications" className="text-muted-foreground hover:text-foreground">
+              <ArrowRight className="size-4" />
+            </Link>
           </div>
+          <div className="mt-6 space-y-5">
+            <div>
+              <p className="text-xs font-medium tracking-wider text-muted-foreground uppercase">Application</p>
+              <div className="mt-2">
+                <AppStatusBadge status={currentApplication.status} />
+              </div>
+              <p className="mt-2 text-sm text-muted-foreground">
+                {currentApplication.appNumber === "DRAFT"
+                  ? "Draft in progress."
+                  : `${currentApplication.appNumber} is ${inReview ? "under review" : currentApplication.status.replaceAll("_", " ").toLowerCase()}.`}
+              </p>
+            </div>
+            <div>
+              <p className="text-xs font-medium tracking-wider text-muted-foreground uppercase">Deposit</p>
+              <div className="mt-2">
+                <DepositStatusBadge status={currentApplication.depositStatus} />
+              </div>
+              <p className="mt-2 text-sm text-muted-foreground">
+                {formatCurrencyTZS(currentApplication.depositAmount)}
+                {currentApplication.depositStatus === "CLEARED"
+                  ? ` received on ${depositDate}.`
+                  : currentApplication.depositReference
+                    ? ` · ${currentApplication.depositReference}`
+                    : " awaiting proof."}
+              </p>
+            </div>
+          </div>
+        </section>
+      </div>
+
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
+        <div className="lg:col-span-2">
+          <AgentDocumentChecklist application={currentApplication} live={mode === "live"} locked={closed || suspended} />
+
+          <section className="mt-5 rounded-[1.75rem] bg-card p-6 shadow-sm ring-1 ring-border/60">
+            <p className="font-semibold text-2xl text-foreground">Recent activity</p>
+            <ul className="mt-4 flex flex-col">
+              {currentApplication.timeline.length === 0 ? (
+                <li className="py-3 text-sm text-muted-foreground">No activity yet.</li>
+              ) : (
+                currentApplication.timeline.slice(0, 5).map((event) => (
+                  <li key={event.id} className="flex items-start justify-between gap-3 border-b border-border/60 py-3 last:border-0">
+                    <p className="text-sm text-foreground">
+                      <span className="font-medium">{event.actor}</span> {event.action}
+                    </p>
+                    <span className="shrink-0 text-xs text-muted-foreground">{formatDateTime(event.timestamp)}</span>
+                  </li>
+                ))
+              )}
+            </ul>
+          </section>
         </div>
 
-        <div className="flex flex-col gap-6">
-          <div className="rounded-lg border border-border bg-card">
-            <div className="border-b border-border px-5 py-4">
-              <h2 className="text-base font-semibold text-foreground">Quick Links</h2>
-            </div>
-            <div className="grid grid-cols-2 gap-3 p-4">
+        <div className="flex flex-col gap-5">
+          <section className="rounded-[1.75rem] bg-card p-6 shadow-sm ring-1 ring-border/60">
+            <p className="font-semibold text-2xl text-foreground">Recommended</p>
+            <ul className="mt-5 flex flex-col gap-3">
               {quickLinks.map((link) => {
                 const Icon = link.icon
+                const inner = (
+                  <>
+                    <span className="flex size-10 items-center justify-center rounded-full bg-secondary">
+                      <Icon className="size-4" />
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block text-sm font-medium text-foreground">{link.label}</span>
+                      {!link.available && (
+                        <span className="text-[10px] font-medium tracking-wider text-muted-foreground uppercase">
+                          Soon
+                        </span>
+                      )}
+                    </span>
+                    <ArrowRight className="size-4 text-muted-foreground" />
+                  </>
+                )
                 if (!link.available) {
                   return (
-                    <div
+                    <li
                       key={link.href}
-                      className="flex flex-col gap-2 rounded-lg border border-dashed border-border p-4 opacity-50"
+                      className="flex items-center gap-3 rounded-2xl px-1 py-1 opacity-50"
                     >
-                      <Icon className="size-5 text-muted-foreground" />
-                      <span className="text-sm font-medium text-foreground">{link.label}</span>
-                      <span className="text-[10px] font-medium tracking-wider text-muted-foreground uppercase">
-                        Coming soon
-                      </span>
-                    </div>
+                      {inner}
+                    </li>
                   )
                 }
                 return (
-                  <Link
-                    key={link.href}
-                    href={link.href}
-                    className="flex flex-col gap-2 rounded-lg border border-border p-4 transition-colors hover:border-accent/40 hover:bg-secondary/60"
-                  >
-                    <Icon className="size-5 text-accent" />
-                    <span className="text-sm font-medium text-foreground">{link.label}</span>
-                  </Link>
+                  <li key={link.href}>
+                    <Link
+                      href={link.href}
+                      className="flex items-center gap-3 rounded-2xl px-1 py-1 transition hover:bg-secondary/70"
+                    >
+                      {inner}
+                    </Link>
+                  </li>
                 )
               })}
-            </div>
-          </div>
+            </ul>
+          </section>
 
-          <div className="rounded-lg border border-border bg-secondary/50 p-5">
-            <h2 className="text-base font-semibold text-foreground">Support</h2>
-            <p className="mt-2 text-sm text-muted-foreground">
-              Need help with your application or the agent portal? Our support team is on standby.
-            </p>
-            <Button className="mt-4 w-full">
+          <section className="rounded-[1.75rem] bg-secondary/70 p-6">
+            <p className="font-semibold text-2xl text-foreground">Applicant</p>
+            <dl className="mt-4 flex flex-col gap-3">
+              <div>
+                <dt className="text-xs font-medium tracking-wider text-muted-foreground uppercase">Phone</dt>
+                <dd className="mt-0.5 font-mono text-sm text-foreground">{formatPhoneTZ(currentAgent.phone)}</dd>
+              </div>
+              <div>
+                <dt className="text-xs font-medium tracking-wider text-muted-foreground uppercase">Application</dt>
+                <dd className="mt-0.5 font-mono text-sm text-foreground">{currentApplication.appNumber}</dd>
+              </div>
+            </dl>
+            <Button className="mt-5 w-full" nativeButton={false} render={<Link href="/agent/help" />}>
               <Headset data-icon="inline-start" />
-              Contact Support
+              Help Center
             </Button>
-          </div>
+          </section>
         </div>
       </div>
     </div>

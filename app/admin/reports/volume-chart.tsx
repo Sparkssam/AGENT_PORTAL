@@ -2,7 +2,6 @@
 
 import { Bar, BarChart, CartesianGrid, XAxis, YAxis } from "recharts"
 import { ChartContainer, ChartTooltip, ChartTooltipContent, ChartLegend, ChartLegendContent } from "@/components/ui/chart"
-import { monthlyVolume } from "@/lib/admin-data"
 
 const config = {
   submitted: { label: "Submitted", color: "var(--chart-4)" },
@@ -11,10 +10,14 @@ const config = {
   rejected: { label: "Rejected", color: "var(--chart-5)" },
 }
 
-export function VolumeChart() {
+export function VolumeChart({
+  data,
+}: {
+  data: { month: string; submitted: number; inReview: number; approved: number; rejected: number }[]
+}) {
   return (
     <ChartContainer config={config} className="h-[280px] w-full">
-      <BarChart data={monthlyVolume} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
+      <BarChart data={data} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
         <CartesianGrid vertical={false} strokeDasharray="3 3" />
         <XAxis dataKey="month" tickLine={false} axisLine={false} />
         <YAxis tickLine={false} axisLine={false} width={40} />

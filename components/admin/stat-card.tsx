@@ -18,7 +18,7 @@ const toneDot: Record<Required<StatCardProps>["tone"], string> = {
 
 export function StatCard({ label, value, icon: Icon, tone = "default" }: StatCardProps) {
   return (
-    <div className="flex flex-col gap-3 rounded-lg border border-border bg-card p-5">
+    <div className="flex flex-col gap-3 rounded-[1.5rem] border border-border bg-card p-5">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <span className={cn("size-1.5 rounded-full", toneDot[tone])} />

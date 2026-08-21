@@ -7,7 +7,6 @@ import { AppStatusBadge, DepositStatusBadge } from "@/components/admin/status-ba
 import { CaseHealthCard } from "@/components/case-health-card"
 import { CorrectionChecklist } from "@/components/correction-checklist"
 import { HelpHint } from "@/components/help/help-hint"
-import { WhatsAppSupportButton } from "@/components/help/whatsapp-support-button"
 import { formatCurrencyTZS } from "@/lib/format"
 import type { AppStatus } from "@/lib/domain"
 import { formatDateLong, formatGps, formatPhoneTZ } from "@/lib/format"
@@ -114,18 +113,13 @@ export default async function ApplicationDetailPage({ params }: { params: Promis
           </p>
           <p className="text-sm text-muted-foreground">
             {application.correctionSummary ||
-              "Review the notes from our team. Open the FAQ if a document was sent back, or chat with support."}
+              "Review the notes from our team. Open the Help Center if a document was sent back."}
           </p>
           <div className="flex flex-wrap items-center gap-2">
             <HelpHint articleId="why-rejected" />
             <a href="/agent/help#why-rejected" className="text-xs font-medium underline-offset-2 hover:underline">
               Why was this rejected?
             </a>
-            <WhatsAppSupportButton
-              size="sm"
-              agentName={application.agentName}
-              applicationNumber={application.appNumber}
-            />
           </div>
         </div>
       )}
@@ -174,8 +168,6 @@ export default async function ApplicationDetailPage({ params }: { params: Promis
             items={application.corrections}
             summary={application.correctionSummary}
             fixHref="/agent/apply"
-            agentName={application.agentName}
-            applicationNumber={application.appNumber}
           />
         </div>
 

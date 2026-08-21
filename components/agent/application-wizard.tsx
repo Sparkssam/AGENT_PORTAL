@@ -837,8 +837,6 @@ export function ApplicationWizard({
               applicationId={applicationId}
               live={live}
               framed={false}
-              agentName={form.fullName || agent.fullName}
-              applicationNumber={application?.appNumber}
               onDocumentsChange={setDocs}
               onApplicationReady={(next) => {
                 setApplicationId(next.id)

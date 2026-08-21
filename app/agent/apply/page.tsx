@@ -9,6 +9,7 @@ import {
 } from "@/lib/data/workspace"
 import { SetupBanner } from "@/components/setup-banner"
 import { PageBackLink } from "@/components/page-back-link"
+import { PageHeader } from "@/components/page-header"
 import { redirect } from "next/navigation"
 
 export const dynamic = "force-dynamic"
@@ -29,14 +30,13 @@ export default async function ApplyPage() {
 
   if (agent.lifecycleStatus === "Suspended") {
     return (
-      <div className="mx-auto flex max-w-3xl flex-col gap-4 px-4 py-8 md:px-6 md:py-10">
+      <div className="portal-page-form gap-4">
         <SetupBanner mode={mode} message={message} />
-        <PageBackLink fallback="/agent/dashboard" />
-        <h1 className="text-3xl font-bold tracking-tight text-foreground">Application paused</h1>
-        <p className="text-sm text-muted-foreground">
-          This account is suspended. You can review existing records, but you cannot start or update an application
-          until an administrator reactivates it.
-        </p>
+        <PageHeader
+          back={<PageBackLink fallback="/agent/dashboard" />}
+          title="Application paused"
+          description="This account is suspended. You can review existing records, but you cannot start or update an application until an administrator reactivates it."
+        />
       </div>
     )
   }
@@ -45,24 +45,18 @@ export default async function ApplyPage() {
   const lookups = mode === "live" ? await lookupsPromise : { channels: [], sectors: [] }
 
   return (
-    <div className="mx-auto flex max-w-3xl flex-col gap-8 px-4 py-8 md:px-6 md:py-10">
+    <div className="portal-page-form">
       <SetupBanner mode={mode} message={message} />
-      <div>
-        <PageBackLink fallback="/agent/dashboard" />
-        <div className="mt-2 flex flex-wrap items-center gap-3">
-          <h1 className="text-3xl font-bold tracking-tight text-foreground md:text-4xl">
-            {application.status === "NEEDS_CORRECTION" ? "Update Application" : "New Application"}
-          </h1>
-          {application.status === "DRAFT" || application.id === "draft" ? (
-            <span className="inline-flex h-5 items-center rounded-md bg-muted px-2 text-[10px] font-semibold tracking-wider text-muted-foreground uppercase">
-              Draft
-            </span>
-          ) : null}
-        </div>
-        <p className="mt-2 text-sm text-muted-foreground">
-          Complete the steps below to submit your agent application.
-        </p>
-      </div>
+      <PageHeader
+        back={<PageBackLink fallback="/agent/dashboard" />}
+        title={application.status === "NEEDS_CORRECTION" ? "Update Application" : "New Application"}
+        description="Complete the steps below to submit your agent application."
+        action={
+          application.status === "DRAFT" || application.id === "draft" ? (
+            <span className="status-badge status-badge-muted">Draft</span>
+          ) : null
+        }
+      />
       {application.status === "NEEDS_CORRECTION" ? (
         <CorrectionChecklist
           documents={application.documents}

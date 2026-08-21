@@ -1,5 +1,6 @@
 import { BadgeCheck } from "lucide-react"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
+import { PageHeader } from "@/components/page-header"
 import { AppStatusBadge } from "@/components/admin/status-badge"
 import { ProfileForm } from "./profile-form"
 import { loadAgentWorkspace } from "@/lib/data/workspace"
@@ -12,15 +13,15 @@ export default async function ProfilePage() {
   const memberSince = formatDateLong(currentAgent.memberSince)
 
   return (
-    <div className="mx-auto flex max-w-3xl flex-col gap-6 p-4 md:p-6">
+    <div className="portal-page-narrow">
       <SetupBanner mode={mode} message={message} />
-      <div>
-        <PageBackLink fallback="/agent/settings" label="Back" />
-        <h1 className="mt-2 text-2xl font-semibold tracking-tight text-foreground md:text-3xl">Profile</h1>
-        <p className="mt-1 text-sm text-muted-foreground">Manage your personal and account information.</p>
-      </div>
+      <PageHeader
+        back={<PageBackLink fallback="/agent/settings" label="Back" />}
+        title="Profile"
+        description="Manage your personal and account information."
+      />
 
-      <div className="flex flex-col gap-4 rounded-lg border border-border bg-card p-5 sm:flex-row sm:items-center">
+      <div className="portal-card flex flex-col gap-4 sm:flex-row sm:items-center">
         <Avatar size="lg">
           <AvatarFallback className="bg-primary text-lg text-primary-foreground">
             {currentAgent.avatarInitials}
@@ -39,12 +40,12 @@ export default async function ProfilePage() {
         </div>
       </div>
 
-      <div className="rounded-lg border border-border bg-card p-5">
+      <div className="portal-card">
         <h2 className="mb-4 text-base font-semibold text-foreground">Personal Information</h2>
         <ProfileForm agent={currentAgent} live={mode === "live"} />
       </div>
 
-      <div className="rounded-lg border border-border bg-card p-5">
+      <div className="portal-card">
         <h2 className="mb-3 text-base font-semibold text-foreground">Account</h2>
         <div className="flex flex-col divide-y divide-border">
           <div className="flex items-center justify-between py-3">

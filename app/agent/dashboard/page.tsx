@@ -1,10 +1,12 @@
 import Link from "next/link"
 import { ArrowRight, BadgeCheck, FileText, Headset, UserRound, Wallet } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { PageHeader } from "@/components/page-header"
 import { AppStatusBadge, DepositStatusBadge } from "@/components/admin/status-badge"
+import { HelpHint } from "@/components/help/help-hint"
 import { loadAgentWorkspace, isNewApplicant } from "@/lib/data/workspace"
 import { SetupBanner } from "@/components/setup-banner"
-import { formatCurrencyTZS, formatDateLong, formatDateTime, formatPhoneTZ } from "@/lib/format"
+import { formatCurrencyTZS, formatDateLong, formatPhoneTZ } from "@/lib/format"
 import { computeCaseHealth } from "@/lib/domain"
 import { isClosedStatus, isInReviewStatus } from "@/lib/backend/status"
 import { AgentDocumentChecklist } from "./document-checklist"
@@ -33,32 +35,29 @@ export default async function AgentDashboardPage() {
   const firstName = currentAgent.fullName.split(" ")[0] || "there"
 
   return (
-    <div className="mx-auto flex max-w-[1400px] flex-col gap-8 p-4 md:px-8 md:pb-10 md:pt-2">
+    <div className="portal-page">
       <SetupBanner mode={mode} message={message} />
-      <div>
-        <h1 className="flex items-center gap-3 font-semibold text-4xl tracking-tight text-foreground md:text-5xl">
-          <span className="h-8 w-1.5 rounded-full bg-accent" aria-hidden />
-          Overview
-        </h1>
-        <p className="mt-3 max-w-xl text-sm text-muted-foreground">
-          {inReview
+      <PageHeader
+        title="Overview"
+        description={
+          inReview
             ? `${firstName}, your application is with the review team. Track status, documents, and deposit below.`
             : completed
               ? `Welcome back, ${firstName}. Your case is ready for the next step.`
-              : `Welcome, ${firstName}. Finish your application and keep documents in one place.`}
-        </p>
-      </div>
+              : `Welcome, ${firstName}. Finish your application and keep documents in one place.`
+        }
+      />
 
       <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
-        <section className="rounded-[1.75rem] bg-card p-6 shadow-sm ring-1 ring-border/60 lg:col-span-2 md:p-8">
-          <p className="font-semibold text-2xl text-foreground">Application</p>
-          <p className="mt-4 font-mono text-4xl font-semibold tracking-tight text-foreground md:text-5xl">
+        <section className="portal-card lg:col-span-2 md:p-8">
+          <p className="portal-section-title">Application</p>
+          <p className="mt-3 font-mono text-2xl font-medium tabular-nums tracking-tight text-foreground md:text-3xl">
             {currentAgent.agentIdNumber}
           </p>
           <div className="mt-3 flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
             <span>Agent since {memberSince}</span>
             {currentAgent.verified && (
-              <span className="inline-flex items-center gap-1 rounded-full bg-success/15 px-2 py-0.5 text-[11px] font-semibold tracking-wide text-success uppercase">
+              <span className="status-badge status-badge-success gap-1">
                 <BadgeCheck className="size-3.5" />
                 Verified
               </span>
@@ -66,7 +65,9 @@ export default async function AgentDashboardPage() {
           </div>
           <div className="mt-6 flex flex-wrap items-center gap-2">
             <AppStatusBadge status={currentApplication.status} />
+            <HelpHint articleId="status-meanings" />
             <DepositStatusBadge status={currentApplication.depositStatus} />
+            <HelpHint articleId="deposit-steps" />
           </div>
           <div className="mt-8">
             <div className="mb-2 flex items-center justify-between text-sm">
@@ -100,16 +101,19 @@ export default async function AgentDashboardPage() {
           </div>
         </section>
 
-        <section className="rounded-[1.75rem] bg-card p-6 shadow-sm ring-1 ring-border/60">
+        <section className="portal-card">
           <div className="flex items-center justify-between">
-            <p className="font-semibold text-2xl text-foreground">Status</p>
-            <Link href="/agent/applications" className="text-muted-foreground hover:text-foreground">
+            <p className="portal-section-title">Status</p>
+            <Link href="/agent/applications" className="text-muted-foreground hover:text-foreground" aria-label="View applications">
               <ArrowRight className="size-4" />
             </Link>
           </div>
           <div className="mt-6 space-y-5">
             <div>
-              <p className="text-xs font-medium tracking-wider text-muted-foreground uppercase">Application</p>
+              <p className="inline-flex items-center gap-1 portal-kicker">
+                Application
+                <HelpHint articleId="status-meanings" className="size-5" />
+              </p>
               <div className="mt-2">
                 <AppStatusBadge status={currentApplication.status} />
               </div>
@@ -120,7 +124,10 @@ export default async function AgentDashboardPage() {
               </p>
             </div>
             <div>
-              <p className="text-xs font-medium tracking-wider text-muted-foreground uppercase">Deposit</p>
+              <p className="inline-flex items-center gap-1 portal-kicker">
+                Deposit
+                <HelpHint articleId="deposit-steps" className="size-5" />
+              </p>
               <div className="mt-2">
                 <DepositStatusBadge status={currentApplication.depositStatus} />
               </div>
@@ -140,29 +147,11 @@ export default async function AgentDashboardPage() {
       <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
         <div className="lg:col-span-2">
           <AgentDocumentChecklist application={currentApplication} live={mode === "live"} locked={closed || suspended} />
-
-          <section className="mt-5 rounded-[1.75rem] bg-card p-6 shadow-sm ring-1 ring-border/60">
-            <p className="font-semibold text-2xl text-foreground">Recent activity</p>
-            <ul className="mt-4 flex flex-col">
-              {currentApplication.timeline.length === 0 ? (
-                <li className="py-3 text-sm text-muted-foreground">No activity yet.</li>
-              ) : (
-                currentApplication.timeline.slice(0, 5).map((event) => (
-                  <li key={event.id} className="flex items-start justify-between gap-3 border-b border-border/60 py-3 last:border-0">
-                    <p className="text-sm text-foreground">
-                      <span className="font-medium">{event.actor}</span> {event.action}
-                    </p>
-                    <span className="shrink-0 text-xs text-muted-foreground">{formatDateTime(event.timestamp)}</span>
-                  </li>
-                ))
-              )}
-            </ul>
-          </section>
         </div>
 
         <div className="flex flex-col gap-5">
-          <section className="rounded-[1.75rem] bg-card p-6 shadow-sm ring-1 ring-border/60">
-            <p className="font-semibold text-2xl text-foreground">Recommended</p>
+          <section className="portal-card">
+            <p className="portal-section-title">Recommended</p>
             <ul className="mt-5 flex flex-col gap-3">
               {quickLinks.map((link) => {
                 const Icon = link.icon
@@ -174,9 +163,7 @@ export default async function AgentDashboardPage() {
                     <span className="min-w-0 flex-1">
                       <span className="block text-sm font-medium text-foreground">{link.label}</span>
                       {!link.available && (
-                        <span className="text-[10px] font-medium tracking-wider text-muted-foreground uppercase">
-                          Soon
-                        </span>
+                        <span className="status-badge status-badge-muted">Soon</span>
                       )}
                     </span>
                     <ArrowRight className="size-4 text-muted-foreground" />
@@ -206,15 +193,15 @@ export default async function AgentDashboardPage() {
             </ul>
           </section>
 
-          <section className="rounded-[1.75rem] bg-secondary/70 p-6">
-            <p className="font-semibold text-2xl text-foreground">Applicant</p>
+          <section className="portal-card-muted">
+            <p className="portal-section-title">Applicant</p>
             <dl className="mt-4 flex flex-col gap-3">
               <div>
-                <dt className="text-xs font-medium tracking-wider text-muted-foreground uppercase">Phone</dt>
+                <dt className="portal-kicker">Phone</dt>
                 <dd className="mt-0.5 font-mono text-sm text-foreground">{formatPhoneTZ(currentAgent.phone)}</dd>
               </div>
               <div>
-                <dt className="text-xs font-medium tracking-wider text-muted-foreground uppercase">Application</dt>
+                <dt className="portal-kicker">Application</dt>
                 <dd className="mt-0.5 font-mono text-sm text-foreground">{currentApplication.appNumber}</dd>
               </div>
             </dl>

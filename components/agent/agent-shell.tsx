@@ -48,7 +48,7 @@ export function AgentShell({
         <div className="flex min-h-0 min-w-0 flex-1 flex-col bg-background">
           <AgentTopbar agent={agent} notifications={notifications} live={live} />
           {agent?.lifecycleStatus === "Suspended" ? (
-            <div className="border-b border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive md:px-6">
+            <div className="portal-callout portal-callout-destructive mx-4 mt-3 md:mx-8" role="status">
               Your agent account is suspended. You can view existing records, but you cannot submit applications or
               upload documents until an administrator reactivates it.
             </div>

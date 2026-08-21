@@ -1,6 +1,6 @@
 "use server"
 
-import { buildDocumentFileName } from "@/lib/domain"
+import { storedDocumentFileName } from "@/lib/domain"
 import { BackendError, ForbiddenError, NotFoundError } from "@/lib/backend/errors"
 import { canAgentChangeDocument, isClosedStatus } from "@/lib/backend/status"
 import { getAuthContext } from "@/lib/backend/session"
@@ -46,6 +46,7 @@ export async function verifyDocument(documentId: string) {
         verifiedById: profile.id,
         verifiedAt: new Date(),
         rejectionReason: null,
+        adminUploaded: false,
       },
     })
   })
@@ -71,7 +72,7 @@ export async function rejectDocument(documentId: string, reason: string) {
   await withDbGuards(async (tx) => {
     await tx.document.update({
       where: { id: documentId },
-      data: { status: "rejected", rejectionReason: reason, verifiedById: null, verifiedAt: null },
+      data: { status: "rejected", rejectionReason: reason, verifiedById: null, verifiedAt: null, adminUploaded: false },
     })
   })
 
@@ -151,6 +152,7 @@ export async function clearDocumentFile(documentId: string) {
         uploadedAt: null,
         verifiedById: null,
         verifiedAt: null,
+        adminUploaded: false,
       },
     })
     if (doc.documentType === "deposit_proof") {
@@ -189,15 +191,14 @@ export async function signedGet(documentId: string, disposition: "inline" | "att
   })
   if (error || !data?.signedUrl) throw new BackendError("DOCUMENT", error?.message ?? "Could not sign download")
 
-  const filename =
-    disposition === "attachment"
-      ? buildDocumentFileName({
-          agentName: app.agentName ?? "Agent",
-          docName: type?.name ?? doc.documentType,
-          network: "Network",
-          extension: doc.fileExtension ?? "png",
-        })
-      : undefined
+  const owner = await getPrisma().agent.findUnique({ where: { id: app.agentId }, select: { agentCode: true } })
+  const filename = storedDocumentFileName({
+    agentName: app.agentName ?? "agent",
+    agentCode: owner?.agentCode,
+    agentId: app.agentId,
+    documentType: type?.code ?? doc.documentType,
+    extension: doc.fileExtension ?? "png",
+  })
 
   if (disposition === "attachment") {
     await writeAudit({
@@ -205,7 +206,7 @@ export async function signedGet(documentId: string, disposition: "inline" | "att
       actorRole: profile.role,
       category: "Document",
       action: "Downloaded document",
-      detail: filename ?? doc.documentType,
+      detail: `${filename} for ${app.agentName ?? "agent"} (${doc.documentType})`,
       entityType: "document",
       entityId: documentId,
       target: app.applicationNumber ?? app.id,

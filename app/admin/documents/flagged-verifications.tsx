@@ -37,7 +37,7 @@ export function FlaggedVerifications({
           itself needs review.
         </p>
       </div>
-      <div className="overflow-hidden rounded-2xl border border-border bg-card">
+      <div className="portal-table">
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-border bg-secondary/50 text-left text-xs uppercase tracking-wide text-muted-foreground">

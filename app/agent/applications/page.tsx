@@ -1,7 +1,9 @@
 import Link from "next/link"
 import { Plus } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { PageHeader } from "@/components/page-header"
 import { AppStatusBadge, DepositStatusBadge } from "@/components/admin/status-badge"
+import { HelpHint } from "@/components/help/help-hint"
 import {
   findEditableApplication,
   findInFlightApplication,
@@ -24,42 +26,47 @@ export default async function MyApplicationsPage() {
   const canStartAnother = !suspended && !editable && !inFlight
 
   return (
-    <div className="mx-auto flex max-w-[1400px] flex-col gap-6 p-4 md:p-6">
+    <div className="portal-page">
       <SetupBanner mode={mode} message={message} />
-      <div className="flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight text-foreground md:text-3xl">My Applications</h1>
-          <p className="mt-1 text-sm text-muted-foreground">Track and manage your submitted applications.</p>
-        </div>
-        {suspended ? null : editable ? (
-          <Button render={<Link href="/agent/apply" />} nativeButton={false}>
-            Continue application
-          </Button>
-        ) : canStartAnother ? (
-          <Button render={<Link href="/agent/apply" />} nativeButton={false}>
-            <Plus data-icon="inline-start" />
-            New Application
-          </Button>
-        ) : null}
-      </div>
+      <PageHeader
+        title="My Applications"
+        description="Track and manage your submitted applications."
+        action={
+          suspended ? null : editable ? (
+            <Button render={<Link href="/agent/apply" />} nativeButton={false}>
+              Continue application
+            </Button>
+          ) : canStartAnother ? (
+            <Button render={<Link href="/agent/apply" />} nativeButton={false}>
+              <Plus data-icon="inline-start" />
+              New Application
+            </Button>
+          ) : null
+        }
+      />
 
-      <div className="overflow-hidden rounded-lg border border-border bg-card">
+      <div className="portal-table">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-border bg-secondary/40 text-left text-xs font-medium tracking-wider text-muted-foreground uppercase">
+              <tr className="portal-table-head">
                 <th className="px-4 py-3">App Number</th>
                 <th className="px-4 py-3">Business Name</th>
                 <th className="px-4 py-3">Channel</th>
                 <th className="px-4 py-3">Submitted</th>
-                <th className="px-4 py-3">App Status</th>
+                <th className="px-4 py-3">
+                  <span className="inline-flex items-center gap-1">
+                    App Status
+                    <HelpHint articleId="status-meanings" />
+                  </span>
+                </th>
                 <th className="px-4 py-3">Deposit</th>
                 <th className="px-4 py-3" />
               </tr>
             </thead>
             <tbody>
               {myApplications.map((app) => (
-                <tr key={app.id} className="border-b border-border last:border-0 hover:bg-secondary/50">
+                <tr key={app.id} className="portal-table-row">
                   <td className="px-4 py-3.5">
                     <Link
                       href={`/agent/applications/${app.id}`}
@@ -97,7 +104,7 @@ export default async function MyApplicationsPage() {
       </div>
 
       {canStartAnother ? (
-        <div className="rounded-lg border border-dashed border-border p-6 text-center">
+        <div className="portal-card text-center">
           <p className="text-sm text-muted-foreground">
             Need to register another outlet? Start a new application for that location.
           </p>

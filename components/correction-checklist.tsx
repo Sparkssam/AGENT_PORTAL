@@ -2,6 +2,8 @@ import Link from "next/link"
 import { CheckCircle2, Clock, XCircle, CircleDashed, ArrowRight, FileWarning } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
+import { HelpHint } from "@/components/help/help-hint"
+import { RejectedDocumentHelp } from "@/components/help/rejected-document-help"
 import type { CorrectionItem, Document, DocumentStatus } from "@/lib/domain"
 
 const meta: Record<
@@ -51,27 +53,34 @@ export function CorrectionChecklist({
   summary,
   fixHref = "/agent/apply",
   showFix = true,
+  agentName,
+  applicationNumber,
 }: {
   documents: Document[]
   items?: CorrectionItem[]
   summary?: string
   fixHref?: string
   showFix?: boolean
+  agentName?: string
+  applicationNumber?: string
 }) {
   const needsWork = documents.filter((d) => d.status === "rejected" || d.status === "missing").length
   const fieldItems = items.filter((item) => item.kind === "field")
   const openCount = needsWork + fieldItems.length
 
   return (
-    <div className="rounded-lg border border-border bg-card">
+    <div className="overflow-hidden rounded-3xl bg-card shadow-sm ring-1 ring-border/60">
       <div className="flex items-center justify-between gap-3 border-b border-border px-5 py-4">
-        <h2 className="text-base font-semibold text-foreground">Correction checklist</h2>
-        <span
-          className={cn(
-            "rounded-md px-2 py-1 text-xs font-medium",
-            openCount > 0 ? "bg-warning/20 text-warning-foreground" : "bg-success/15 text-success",
-          )}
-        >
+        <h2 className="inline-flex items-center gap-1.5 text-base font-semibold text-foreground">
+          Correction checklist
+          <HelpHint articleId="how-to-reupload" />
+        </h2>
+          <span
+            className={cn(
+              "status-badge",
+              openCount > 0 ? "status-badge-warning" : "status-badge-success",
+            )}
+          >
           {openCount > 0 ? `${openCount} to fix` : "All clear"}
         </span>
       </div>
@@ -123,6 +132,15 @@ export function CorrectionChecklist({
                 {(requested?.reason || (doc.reason && actionable)) && (
                   <p className="mt-0.5 text-xs text-muted-foreground">{requested?.reason || doc.reason}</p>
                 )}
+                {doc.status === "rejected" ? (
+                  <RejectedDocumentHelp
+                    agentName={agentName}
+                    applicationNumber={applicationNumber}
+                    documentType={doc.type}
+                    documentName={doc.name}
+                    reason={requested?.reason || doc.reason}
+                  />
+                ) : null}
                 {doc.status === "missing" && !doc.reason && !requested && (
                   <p className="mt-0.5 text-xs text-muted-foreground">Not uploaded yet.</p>
                 )}

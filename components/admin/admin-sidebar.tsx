@@ -68,8 +68,8 @@ export function AdminSidebar() {
   return (
     <aside
       className={cn(
-        "sticky top-0 hidden h-full shrink-0 flex-col bg-sidebar text-sidebar-foreground transition-[width] duration-300 ease-out md:flex",
-        collapsed ? "w-[4.75rem]" : "w-64 lg:w-72",
+        "sticky top-0 hidden h-full shrink-0 flex-col border-r border-sidebar-border bg-sidebar text-sidebar-foreground transition-[width] duration-300 ease-out md:flex",
+        collapsed ? "w-(--sidebar-width-collapsed)" : "w-(--sidebar-width) lg:w-(--sidebar-width-lg)",
       )}
     >
       <WorkspaceBrand collapsed={collapsed} onToggle={toggle} subtitle="Admin Portal" />
@@ -88,7 +88,7 @@ export function AdminSidebar() {
                   collapsed ? "justify-center px-0 py-2.5" : "gap-3 px-3 py-2.5",
                   active
                     ? "bg-sidebar-accent font-medium text-sidebar-accent-foreground shadow-sm"
-                    : "text-sidebar-foreground/70 hover:bg-sidebar-accent/60 hover:text-sidebar-foreground",
+                    : "font-medium text-sidebar-foreground hover:bg-sidebar-accent/70",
                 )}
               >
                 <Icon className="size-4 shrink-0" />
@@ -150,7 +150,7 @@ export function AdminSidebar() {
                   collapsed ? "justify-center px-0 py-2.5" : "gap-3 px-3 py-2.5",
                   pathname?.startsWith("/admin/help")
                     ? "bg-sidebar-accent font-medium text-sidebar-accent-foreground shadow-sm"
-                    : "text-sidebar-foreground/70 hover:bg-sidebar-accent/60 hover:text-sidebar-foreground",
+                    : "font-medium text-sidebar-foreground hover:bg-sidebar-accent/70",
                 )}
               >
                 <LifeBuoy className="size-4 shrink-0" />
@@ -167,7 +167,7 @@ export function AdminSidebar() {
                   collapsed ? "justify-center px-0 py-2.5" : "gap-3 px-3 py-2.5",
                   pathname?.startsWith("/admin/settings")
                     ? "bg-sidebar-accent font-medium text-sidebar-accent-foreground shadow-sm"
-                    : "text-sidebar-foreground/70 hover:bg-sidebar-accent/60 hover:text-sidebar-foreground",
+                    : "font-medium text-sidebar-foreground hover:bg-sidebar-accent/70",
                 )}
               >
                 <Settings className="size-4 shrink-0" />

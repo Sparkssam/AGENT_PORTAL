@@ -8,10 +8,8 @@ export default async function AdminSettingsPage() {
   const session = live ? await getSession() : null
 
   return (
-    <>
-      <div className="px-4 pt-4 md:px-8">
-        <SetupBanner mode={live ? "live" : "setup"} />
-      </div>
+    <div className="portal-page">
+      <SetupBanner mode={live ? "live" : "setup"} />
       <SettingsWorkspace
         portal="admin"
         email={session?.email ?? ""}
@@ -19,6 +17,6 @@ export default async function AdminSettingsPage() {
         live={live}
         role={session?.title ?? "Administrator"}
       />
-    </>
+    </div>
   )
 }

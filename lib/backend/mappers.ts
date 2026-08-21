@@ -33,6 +33,9 @@ export function mapDocument(row: DocRow, types?: DocumentTypeRow[]): Document {
     fileExtension: row.file_extension ?? undefined,
     reason: row.rejection_reason ?? undefined,
     required: types?.find((t) => t.code === row.document_type)?.required,
+    originalName: row.original_name ?? undefined,
+    storedFileName: row.storage_key?.split("/").pop() || undefined,
+    adminUploaded: Boolean(row.admin_uploaded),
   }
 }
 

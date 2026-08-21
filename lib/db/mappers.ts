@@ -47,6 +47,8 @@ export function mapPrismaDocument(
     reason: doc.rejectionReason ?? undefined,
     required: doc.type?.required,
     originalName: doc.originalName ?? undefined,
+    storedFileName: doc.storageKey?.split("/").pop() || undefined,
+    adminUploaded: Boolean((doc as { adminUploaded?: boolean }).adminUploaded),
     fileSize: doc.fileSize != null ? Number(doc.fileSize) : undefined,
     mimeType: doc.mimeType ?? undefined,
     verificationPassed: latest ? latest.passed : undefined,
@@ -83,6 +85,7 @@ export type PrismaApplicationBundle = Prisma.ApplicationGetPayload<{
     deposit: true
     channel: true
     sector: true
+    agent: { select: { agentCode: true } }
     correctionRequests: { include: { items: true } }
   }
 }>
@@ -96,6 +99,7 @@ export function mapPrismaApplication(row: PrismaApplicationBundle): Application 
   return {
     id: row.id,
     agentId: row.agentId,
+    agentCode: row.agent?.agentCode ?? undefined,
     appNumber: row.applicationNumber ?? "DRAFT",
     agentName: row.agentName ?? "",
     tinNumber: row.tinNumber ?? undefined,

@@ -1,13 +1,14 @@
 import { Analytics } from '@vercel/analytics/next'
 import type { Metadata, Viewport } from 'next'
-import { Manrope, IBM_Plex_Mono } from 'next/font/google'
+import { IBM_Plex_Sans, IBM_Plex_Mono } from 'next/font/google'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { AuthProvider } from '@/lib/auth-context'
 import './globals.css'
 
-const manrope = Manrope({
+const ibmPlexSans = IBM_Plex_Sans({
   subsets: ['latin'],
-  variable: '--font-manrope',
+  weight: ['400', '500', '600'],
+  variable: '--font-ibm-plex-sans',
   display: 'swap',
 })
 
@@ -45,7 +46,7 @@ export const metadata: Metadata = {
 
 export const viewport: Viewport = {
   colorScheme: 'light',
-  themeColor: [{ media: '(prefers-color-scheme: light)', color: '#faf8f5' }],
+  themeColor: [{ media: '(prefers-color-scheme: light)', color: '#DBDAD6' }],
   userScalable: true,
 }
 
@@ -55,7 +56,7 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   return (
-    <html lang="en" className={`${manrope.variable} ${ibmPlexMono.variable} h-dvh bg-background`}>
+    <html lang="en" className={`${ibmPlexSans.variable} ${ibmPlexMono.variable} h-dvh bg-background`}>
       <body className="m-0 h-dvh w-full overflow-hidden p-0 font-sans antialiased">
         <AuthProvider>
           <TooltipProvider delay={150}>{children}</TooltipProvider>

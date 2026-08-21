@@ -2,9 +2,12 @@ import Link from "next/link"
 import { notFound, redirect } from "next/navigation"
 import { ArrowLeft, CheckCircle2, Download, MapPin } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { PageHeader } from "@/components/page-header"
 import { AppStatusBadge, DepositStatusBadge } from "@/components/admin/status-badge"
 import { CaseHealthCard } from "@/components/case-health-card"
 import { CorrectionChecklist } from "@/components/correction-checklist"
+import { HelpHint } from "@/components/help/help-hint"
+import { WhatsAppSupportButton } from "@/components/help/whatsapp-support-button"
 import { formatCurrencyTZS } from "@/lib/format"
 import type { AppStatus } from "@/lib/domain"
 import { formatDateLong, formatGps, formatPhoneTZ } from "@/lib/format"
@@ -25,7 +28,7 @@ export default async function ApplicationDetailPage({ params }: { params: Promis
   const currentIndex = statusFlow.indexOf(application.status)
 
   return (
-    <div className="mx-auto flex max-w-[1200px] flex-col gap-6 p-4 md:p-6">
+    <div className="portal-page">
       <div className="flex flex-col gap-4">
         <Button
           variant="ghost"
@@ -38,38 +41,42 @@ export default async function ApplicationDetailPage({ params }: { params: Promis
           Back to My Applications
         </Button>
 
-        <div className="flex flex-wrap items-start justify-between gap-4">
-          <div>
-            <div className="flex items-center gap-3">
-              <h1 className="font-mono text-2xl font-semibold tracking-tight text-foreground md:text-3xl">
-                {application.appNumber}
-              </h1>
+        <PageHeader
+          title={
+            <span className="flex flex-wrap items-center gap-3">
+              {application.appNumber}
               <AppStatusBadge status={application.status} />
-            </div>
-            <p className="mt-1 text-sm text-muted-foreground">
+              <HelpHint articleId="status-meanings" />
+            </span>
+          }
+          mono
+          description={
+            <>
               {application.businessName}
               {application.status === "DRAFT"
                 ? " · Draft"
                 : ` · Submitted ${formatDateLong(application.submittedAt, "local")}`}
-            </p>
-          </div>
-          {suspended ? null : application.status === "NEEDS_CORRECTION" || application.status === "DRAFT" ? (
-            <Button render={<Link href="/agent/apply" />} nativeButton={false}>
-              Continue application
-            </Button>
-          ) : (
-            <Button variant="outline">
-              <Download data-icon="inline-start" />
-              Download Summary
-            </Button>
-          )}
-        </div>
+            </>
+          }
+          action={
+            suspended ? null : application.status === "NEEDS_CORRECTION" || application.status === "DRAFT" ? (
+              <Button render={<Link href="/agent/apply" />} nativeButton={false}>
+                Continue application
+              </Button>
+            ) : (
+              <Button variant="outline">
+                <Download data-icon="inline-start" />
+                Download Summary
+              </Button>
+            )
+          }
+        />
       </div>
 
       <CaseHealthCard application={application} />
 
       {!isRejectedOrCorrection && (
-        <div className="rounded-lg border border-border bg-card p-5">
+        <div className="portal-card">
           <ol className="flex items-center">
             {statusFlow.map((s, index) => {
               const done = index <= currentIndex
@@ -101,22 +108,31 @@ export default async function ApplicationDetailPage({ params }: { params: Promis
       )}
 
       {isRejectedOrCorrection && (
-        <div className="rounded-lg border border-warning/30 bg-warning/10 p-5">
-          <p className="text-sm font-medium text-warning-foreground">
+        <div className="portal-callout portal-callout-warning flex-col">
+          <p className="text-sm font-medium text-foreground">
             {application.status === "REJECTED" ? "This application was rejected." : "This application needs correction."}
           </p>
-          {isRejectedOrCorrection && (
-            <p className="mt-1 text-sm text-warning-foreground/80">
-              {application.correctionSummary ||
-                "Please review the notes from our team and contact support if you need help resolving this."}
-            </p>
-          )}
+          <p className="text-sm text-muted-foreground">
+            {application.correctionSummary ||
+              "Review the notes from our team. Open the FAQ if a document was sent back, or chat with support."}
+          </p>
+          <div className="flex flex-wrap items-center gap-2">
+            <HelpHint articleId="why-rejected" />
+            <a href="/agent/help#why-rejected" className="text-xs font-medium underline-offset-2 hover:underline">
+              Why was this rejected?
+            </a>
+            <WhatsAppSupportButton
+              size="sm"
+              agentName={application.agentName}
+              applicationNumber={application.appNumber}
+            />
+          </div>
         </div>
       )}
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
         <div className="flex flex-col gap-6 lg:col-span-2">
-          <div className="rounded-lg border border-border bg-card">
+          <div className="portal-table">
             <div className="border-b border-border px-5 py-4">
               <h2 className="text-base font-semibold text-foreground">Applicant Details</h2>
             </div>
@@ -158,12 +174,17 @@ export default async function ApplicationDetailPage({ params }: { params: Promis
             items={application.corrections}
             summary={application.correctionSummary}
             fixHref="/agent/apply"
+            agentName={application.agentName}
+            applicationNumber={application.appNumber}
           />
         </div>
 
         <div className="flex flex-col gap-6">
-          <div className="rounded-lg border border-border bg-card p-5">
-            <h2 className="text-base font-semibold text-foreground">Deposit</h2>
+          <div className="portal-card">
+            <h2 className="inline-flex items-center gap-1.5 text-base font-semibold text-foreground">
+              Deposit
+              <HelpHint articleId="deposit-steps" />
+            </h2>
             <div className="mt-3 flex items-center justify-between">
               <span className="text-sm text-muted-foreground">Status</span>
               <DepositStatusBadge status={application.depositStatus} />

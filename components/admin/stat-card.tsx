@@ -18,7 +18,7 @@ const toneDot: Record<Required<StatCardProps>["tone"], string> = {
 
 export function StatCard({ label, value, icon: Icon, tone = "default" }: StatCardProps) {
   return (
-    <div className="flex flex-col gap-3 rounded-[1.5rem] border border-border bg-card p-5">
+    <div className="portal-stat-card">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <span className={cn("size-1.5 rounded-full", toneDot[tone])} />
@@ -26,7 +26,7 @@ export function StatCard({ label, value, icon: Icon, tone = "default" }: StatCar
         </div>
         <Icon className="size-4 text-muted-foreground/60" />
       </div>
-      <p className="font-mono text-3xl font-semibold tracking-tight text-foreground">
+      <p className="font-mono text-2xl font-medium tabular-nums tracking-tight text-foreground">
         {typeof value === "number" ? value.toLocaleString("en-US") : value}
       </p>
     </div>

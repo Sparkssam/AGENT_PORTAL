@@ -33,6 +33,7 @@ const applicationInclude = {
   deposit: true,
   channel: true,
   sector: true,
+  agent: { select: { agentCode: true } },
   correctionRequests: {
     where: { resolvedAt: null },
     orderBy: { createdAt: "desc" as const },
@@ -46,6 +47,7 @@ const listInclude = {
   deposit: true,
   channel: true,
   sector: true,
+  agent: { select: { agentCode: true } },
   correctionRequests: {
     where: { resolvedAt: null },
     orderBy: { createdAt: "desc" as const },

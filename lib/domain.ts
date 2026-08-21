@@ -58,6 +58,8 @@ export interface Document {
   reason?: string
   required?: boolean
   originalName?: string
+  storedFileName?: string
+  adminUploaded?: boolean
   fileSize?: number
   mimeType?: string
   verificationPassed?: boolean
@@ -94,6 +96,7 @@ export interface DuplicateMatch {
 export interface Application {
   id: string
   agentId?: string
+  agentCode?: string
   appNumber: string
   agentName: string
   tinNumber?: string
@@ -186,7 +189,30 @@ export interface AuditLogEntry {
 }
 
 export function sanitizeFileToken(value: string) {
-  return value.trim().replace(/[^a-zA-Z0-9]+/g, "")
+  return value.trim().toLowerCase().replace(/[^a-z0-9]+/g, "")
+}
+
+/** Short collision-resistant id from AG-2026-00842 or a UUID. */
+export function shortAgentId(agentCode?: string | null, agentId?: string | null) {
+  const digits = (agentCode ?? "").replace(/\D/g, "")
+  if (digits.length >= 4) return digits.slice(-6)
+  const code = sanitizeFileToken(agentCode ?? "")
+  if (code.length >= 6) return code.slice(-8)
+  return sanitizeFileToken(agentId ?? "agent").slice(0, 8) || "agent"
+}
+
+export function storedDocumentFileName(opts: {
+  agentName: string
+  agentCode?: string | null
+  agentId?: string | null
+  documentType: string
+  extension?: string
+}) {
+  const first = sanitizeFileToken(opts.agentName.split(/\s+/)[0] || "agent") || "agent"
+  const id = shortAgentId(opts.agentCode, opts.agentId)
+  const type = sanitizeFileToken(opts.documentType) || "document"
+  const ext = (opts.extension ?? "png").replace(/^\.+/, "").toLowerCase()
+  return `${first}_${id}_${type}.${ext}`
 }
 
 export function buildDocumentFileName(opts: {
@@ -194,10 +220,22 @@ export function buildDocumentFileName(opts: {
   docName: string
   network: string
   extension?: string
+  agentCode?: string | null
+  agentId?: string | null
+  documentType?: string
 }) {
-  const name = sanitizeFileToken(opts.agentName) || "Agent"
-  const doc = sanitizeFileToken(opts.docName) || "Document"
-  const network = sanitizeFileToken(opts.network) || "Network"
+  if (opts.documentType) {
+    return storedDocumentFileName({
+      agentName: opts.agentName,
+      agentCode: opts.agentCode,
+      agentId: opts.agentId,
+      documentType: opts.documentType,
+      extension: opts.extension,
+    })
+  }
+  const name = sanitizeFileToken(opts.agentName) || "agent"
+  const doc = sanitizeFileToken(opts.docName) || "document"
+  const network = sanitizeFileToken(opts.network) || "network"
   const ext = (opts.extension ?? "png").replace(/^\.+/, "").toLowerCase()
   return `${name}_${doc}_${network}.${ext}`
 }

@@ -3,6 +3,24 @@ export const CHANNEL_PARENT_NAME = "16860-LOST"
 export const CHANNEL_MANAGER_NAME = "16860-LOST"
 export const CHANNEL_TIER = "Agent"
 export const CHANNEL_MANAGER_TYPES = ["Super Agent", "Super Agent Outlet"] as const
+
+export const NETWORK_CHANNELS = [
+  { name: "Mixx by Yas", code: "mixx_by_yas", aliases: ["Tigo Pesa", "Tigo", "Yas", "Mixx"] },
+  { name: "Vodacom", code: "vodacom", aliases: ["M-Pesa", "Vodacom M-Pesa"] },
+  { name: "Airtel", code: "airtel", aliases: ["Airtel Money"] },
+  { name: "Halotel", code: "halotel", aliases: ["HaloPesa"] },
+  { name: "TTCL", code: "ttcl", aliases: ["T-Pesa", "TTCL Pesa"] },
+] as const
+
+export function channelMatchesFilter(appChannel: string | null | undefined, selected: string) {
+  if (selected === "all") return true
+  const value = (appChannel ?? "").trim().toLowerCase()
+  if (!value) return false
+  const option = NETWORK_CHANNELS.find((item) => item.name === selected || item.code === selected)
+  if (!option) return value === selected.toLowerCase()
+  return [option.name, option.code, ...option.aliases].some((name) => name.toLowerCase() === value)
+}
+
 export const ID_TYPES = ["National ID (NIDA)", "Driver's Licence", "Voter ID"] as const
 
 export function isChannelManagerType(value: string | null | undefined) {

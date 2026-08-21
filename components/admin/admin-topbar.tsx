@@ -34,7 +34,7 @@ export function AdminTopbar() {
   }
 
   return (
-    <header className="flex h-16 items-center gap-3 bg-background px-4 md:px-8">
+    <header className="portal-topbar">
       <Button
         variant="ghost"
         size="icon"

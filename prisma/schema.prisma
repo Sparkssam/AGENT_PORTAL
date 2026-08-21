@@ -250,6 +250,7 @@ model Document {
   fileSize         BigInt?        @map("file_size")
   fileExtension    String?        @map("file_extension")
   rejectionReason  String?        @map("rejection_reason")
+  adminUploaded    Boolean        @default(false) @map("admin_uploaded")
   verifiedById     String?        @map("verified_by") @db.Uuid
   verifiedAt       DateTime?      @map("verified_at") @db.Timestamptz(6)
   uploadedAt       DateTime?      @map("uploaded_at") @db.Timestamptz(6)

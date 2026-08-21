@@ -93,7 +93,7 @@ export function CaseHealthCard({
 
   return (
     <section
-      className={cn("overflow-hidden rounded-xl border border-border bg-card", className)}
+      className={cn("overflow-hidden rounded-3xl bg-card shadow-sm ring-1 ring-border/60", className)}
       aria-label={`Case summary for ${application.appNumber}`}
     >
       <header className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-5 py-4">

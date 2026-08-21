@@ -2,9 +2,8 @@
 
 import { useEffect, useMemo, useState } from "react"
 import Link from "next/link"
-import { Search, SlidersHorizontal, ChevronLeft, ChevronRight } from "lucide-react"
+import { Search } from "lucide-react"
 import { Input } from "@/components/ui/input"
-import { Button } from "@/components/ui/button"
 import {
   Select,
   SelectContent,
@@ -14,7 +13,9 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { AppStatusBadge, DepositStatusBadge } from "@/components/admin/status-badge"
+import { TablePagination } from "@/components/table-pagination"
 import { computeCaseHealth, statusLabels, type Application, type AppStatus, type HealthTone } from "@/lib/domain"
+import { NETWORK_CHANNELS, channelMatchesFilter } from "@/lib/lookups/catalog"
 import { cn } from "@/lib/utils"
 
 const statusOptions: AppStatus[] = [
@@ -45,16 +46,12 @@ export function ApplicationsTable({
   const [query, setQuery] = useState(initialQuery)
   const [status, setStatus] = useState<string>("all")
   const [channel, setChannel] = useState<string>("all")
-  const [sector, setSector] = useState<string>("all")
   const [page, setPage] = useState(1)
 
   useEffect(() => {
     setQuery(initialQuery)
     setPage(1)
   }, [initialQuery])
-
-  const channels = useMemo(() => Array.from(new Set(applications.map((a) => a.channel).filter(Boolean))), [applications])
-  const sectors = useMemo(() => Array.from(new Set(applications.map((a) => a.sector).filter(Boolean))), [applications])
 
   const filtered = useMemo(() => {
     return applications.filter((app) => {
@@ -65,11 +62,10 @@ export function ApplicationsTable({
         app.phone.includes(query) ||
         app.idNumber.toLowerCase().includes(query.toLowerCase())
       const matchesStatus = status === "all" || app.status === status
-      const matchesChannel = channel === "all" || app.channel === channel
-      const matchesSector = sector === "all" || app.sector === sector
-      return matchesQuery && matchesStatus && matchesChannel && matchesSector
+      const matchesChannel = channelMatchesFilter(app.channel, channel)
+      return matchesQuery && matchesStatus && matchesChannel
     })
-  }, [query, status, channel, sector, applications])
+  }, [query, status, channel, applications])
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))
   const paged = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
@@ -78,20 +74,22 @@ export function ApplicationsTable({
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex flex-col gap-3 md:flex-row md:items-center">
-        <div className="relative flex-1">
+      <div className="portal-card portal-toolbar">
+        <div className="relative min-w-0 flex-1">
           <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
           <Input
+            id="applications-search"
             value={query}
             onChange={(e) => {
               setQuery(e.target.value)
               setPage(1)
             }}
             placeholder="Search application number, agent name, or phone..."
+            aria-label="Search applications"
             className="pl-9"
           />
         </div>
-        <div className="flex flex-wrap gap-2">
+        <div className="flex w-full flex-wrap gap-2 lg:w-auto">
           <Select
             value={status}
             onValueChange={(v) => {
@@ -99,7 +97,7 @@ export function ApplicationsTable({
               setPage(1)
             }}
           >
-            <SelectTrigger className="w-[150px]">
+            <SelectTrigger className="w-full sm:w-[150px]" aria-label="Filter by status">
               <SelectValue placeholder="Status" />
             </SelectTrigger>
             <SelectContent>
@@ -121,55 +119,28 @@ export function ApplicationsTable({
               setPage(1)
             }}
           >
-            <SelectTrigger className="w-[150px]">
+            <SelectTrigger className="w-full sm:w-[180px]" aria-label="Filter by channel">
               <SelectValue placeholder="Channel" />
             </SelectTrigger>
             <SelectContent>
               <SelectGroup>
                 <SelectItem value="all">Channel: All</SelectItem>
-                {channels.map((c) => (
-                  <SelectItem key={c} value={c}>
-                    {c}
+                {NETWORK_CHANNELS.map((item) => (
+                  <SelectItem key={item.code} value={item.name}>
+                    {item.name}
                   </SelectItem>
                 ))}
               </SelectGroup>
             </SelectContent>
           </Select>
-
-          <Select
-            value={sector}
-            onValueChange={(v) => {
-              setSector(v ?? "all")
-              setPage(1)
-            }}
-          >
-            <SelectTrigger className="w-[150px]">
-              <SelectValue placeholder="Sector" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectGroup>
-                <SelectItem value="all">Sector: All</SelectItem>
-                {sectors.map((s) => (
-                  <SelectItem key={s} value={s}>
-                    {s}
-                  </SelectItem>
-                ))}
-              </SelectGroup>
-            </SelectContent>
-          </Select>
-
-          <Button variant="outline">
-            <SlidersHorizontal data-icon="inline-start" />
-            More
-          </Button>
         </div>
       </div>
 
-      <div className="overflow-hidden rounded-lg border border-border bg-card">
+      <div className="portal-table">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-border bg-secondary/40 text-left text-xs font-medium tracking-wider text-muted-foreground uppercase">
+              <tr className="portal-table-head">
                 <th className="px-4 py-3">App Number</th>
                 <th className="px-4 py-3">Agent Name</th>
                 <th className="px-4 py-3">Phone</th>
@@ -185,7 +156,7 @@ export function ApplicationsTable({
                 const health = computeCaseHealth(app)
                 const meta = healthMeta[health.tone]
                 return (
-                <tr key={app.id} className="border-b border-border last:border-0 hover:bg-secondary/50">
+                <tr key={app.id} className="portal-table-row">
                   <td className="px-4 py-3.5">
                     <Link href={`/admin/applications/${app.id}`} className="font-mono text-sm font-medium text-foreground hover:underline">
                       {app.appNumber}
@@ -214,8 +185,9 @@ export function ApplicationsTable({
               )})}
               {paged.length === 0 && (
                 <tr>
-                  <td colSpan={8} className="px-4 py-10 text-center text-sm text-muted-foreground">
-                    No applications match your filters.
+                  <td colSpan={8} className="portal-empty">
+                    <p className="portal-empty-title">No applications match</p>
+                    <p className="portal-empty-copy">Try a different search, or clear a filter.</p>
                   </td>
                 </tr>
               )}
@@ -223,31 +195,15 @@ export function ApplicationsTable({
           </table>
         </div>
 
-        <div className="flex flex-col items-center justify-between gap-3 border-t border-border bg-secondary/30 px-4 py-3 sm:flex-row">
-          <p className="text-sm text-muted-foreground">
-            Showing <span className="font-medium text-foreground">{rangeStart}</span> to{" "}
-            <span className="font-medium text-foreground">{rangeEnd}</span> of{" "}
-            <span className="font-medium text-foreground">{filtered.length}</span> results
-          </p>
-          <div className="flex items-center gap-1">
-            <Button variant="outline" size="icon" disabled={page === 1} onClick={() => setPage((p) => p - 1)} aria-label="Previous page">
-              <ChevronLeft />
-            </Button>
-            {Array.from({ length: totalPages }).slice(0, 3).map((_, i) => (
-              <Button
-                key={i}
-                variant={page === i + 1 ? "default" : "outline"}
-                size="icon"
-                onClick={() => setPage(i + 1)}
-              >
-                {i + 1}
-              </Button>
-            ))}
-            <Button variant="outline" size="icon" disabled={page === totalPages} onClick={() => setPage((p) => p + 1)} aria-label="Next page">
-              <ChevronRight />
-            </Button>
-          </div>
-        </div>
+        <TablePagination
+          page={page}
+          totalPages={totalPages}
+          rangeStart={rangeStart}
+          rangeEnd={rangeEnd}
+          total={filtered.length}
+          onPage={setPage}
+          noun="applications"
+        />
       </div>
     </div>
   )

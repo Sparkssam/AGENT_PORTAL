@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
-import { Search, ChevronLeft, ChevronRight, Phone, Mail, Calendar, FileStack } from "lucide-react"
+import { Search, Phone, Mail, Calendar, FileStack } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
@@ -33,6 +33,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
 import { AppStatusBadge } from "@/components/admin/status-badge"
+import { TablePagination } from "@/components/table-pagination"
 import { statusLabels, type Agent, type Application, type AppStatus } from "@/lib/domain"
 import { setAgentStatus } from "@/lib/actions/agents"
 
@@ -191,12 +192,12 @@ export function AgentsTable({
   return (
     <div className="flex flex-col gap-4">
       {error ? (
-        <p className="rounded-lg border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+        <p role="alert" className="portal-callout portal-callout-destructive">
           {error}
         </p>
       ) : null}
-      <div className="flex flex-col gap-3 md:flex-row md:items-center">
-        <div className="relative flex-1">
+      <div className="portal-card portal-toolbar">
+        <div className="relative min-w-0 flex-1">
           <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
           <Input
             value={query}
@@ -205,10 +206,11 @@ export function AgentsTable({
               setPage(1)
             }}
             placeholder="Search agent name, agent ID, or phone..."
+            aria-label="Search agents"
             className="pl-9"
           />
         </div>
-        <div className="flex flex-wrap gap-2">
+        <div className="flex w-full flex-wrap gap-2 lg:w-auto">
           <Select
             value={channel}
             onValueChange={(v) => {
@@ -216,7 +218,7 @@ export function AgentsTable({
               setPage(1)
             }}
           >
-            <SelectTrigger className="w-[160px]">
+            <SelectTrigger className="w-full sm:w-[160px]" aria-label="Filter by channel">
               <SelectValue placeholder="Channel" />
             </SelectTrigger>
             <SelectContent>
@@ -238,7 +240,7 @@ export function AgentsTable({
               setPage(1)
             }}
           >
-            <SelectTrigger className="w-[180px]">
+            <SelectTrigger className="w-full sm:w-[180px]" aria-label="Filter by status">
               <SelectValue placeholder="Status" />
             </SelectTrigger>
             <SelectContent>
@@ -255,11 +257,11 @@ export function AgentsTable({
         </div>
       </div>
 
-      <div className="overflow-hidden rounded-lg border border-border bg-card">
+      <div className="portal-table">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-border bg-secondary/40 text-left text-xs font-medium tracking-wider text-muted-foreground uppercase">
+              <tr className="portal-table-head">
                 <th className="px-4 py-3">Agent</th>
                 <th className="px-4 py-3">Agent ID</th>
                 <th className="px-4 py-3">Phone</th>
@@ -275,7 +277,7 @@ export function AgentsTable({
                 <tr
                   key={agent.id}
                   onClick={() => setSelectedAgent(agent)}
-                  className="cursor-pointer border-b border-border last:border-0 hover:bg-secondary/50"
+                  className="portal-table-row cursor-pointer"
                 >
                   <td className="px-4 py-3.5">
                     <div className="flex items-center gap-3">
@@ -295,7 +297,7 @@ export function AgentsTable({
                     <div className="flex flex-wrap items-center gap-1.5">
                       <AppStatusBadge status={agent.applicationStatus ?? "DRAFT"} />
                       {agent.status === "Suspended" ? (
-                        <span className="inline-flex items-center rounded-md bg-destructive/10 px-2 py-1 text-[11px] font-semibold tracking-wide text-destructive uppercase">
+                        <span className="status-badge status-badge-destructive">
                           Suspended
                         </span>
                       ) : null}
@@ -316,8 +318,9 @@ export function AgentsTable({
               ))}
               {paged.length === 0 && (
                 <tr>
-                  <td colSpan={8} className="px-4 py-10 text-center text-sm text-muted-foreground">
-                    No agents match your filters.
+                  <td colSpan={8} className="portal-empty">
+                    <p className="portal-empty-title">No agents match</p>
+                    <p className="portal-empty-copy">Try a different search, or clear a filter.</p>
                   </td>
                 </tr>
               )}
@@ -325,40 +328,15 @@ export function AgentsTable({
           </table>
         </div>
 
-        <div className="flex flex-col items-center justify-between gap-3 border-t border-border bg-secondary/30 px-4 py-3 sm:flex-row">
-          <p className="text-sm text-muted-foreground">
-            Showing <span className="font-medium text-foreground">{rangeStart}</span> to{" "}
-            <span className="font-medium text-foreground">{rangeEnd}</span> of{" "}
-            <span className="font-medium text-foreground">{filtered.length}</span> results
-          </p>
-          <div className="flex items-center gap-1">
-            <Button
-              variant="outline"
-              size="icon"
-              disabled={page === 1}
-              onClick={() => setPage((p) => p - 1)}
-              aria-label="Previous page"
-            >
-              <ChevronLeft />
-            </Button>
-            {Array.from({ length: totalPages })
-              .slice(0, 3)
-              .map((_, i) => (
-                <Button key={i} variant={page === i + 1 ? "default" : "outline"} size="icon" onClick={() => setPage(i + 1)}>
-                  {i + 1}
-                </Button>
-              ))}
-            <Button
-              variant="outline"
-              size="icon"
-              disabled={page === totalPages}
-              onClick={() => setPage((p) => p + 1)}
-              aria-label="Next page"
-            >
-              <ChevronRight />
-            </Button>
-          </div>
-        </div>
+        <TablePagination
+          page={page}
+          totalPages={totalPages}
+          rangeStart={rangeStart}
+          rangeEnd={rangeEnd}
+          total={filtered.length}
+          onPage={setPage}
+          noun="agents"
+        />
       </div>
 
       <Sheet open={!!selectedAgent} onOpenChange={(open) => !open && setSelectedAgent(null)}>
@@ -384,7 +362,7 @@ export function AgentsTable({
                   <div className="flex flex-wrap items-center gap-1.5">
                     <AppStatusBadge status={selectedAgent.applicationStatus ?? "DRAFT"} />
                     {selectedAgent.status === "Suspended" ? (
-                      <span className="inline-flex items-center rounded-md bg-destructive/10 px-2 py-1 text-[11px] font-semibold tracking-wide text-destructive uppercase">
+                      <span className="status-badge status-badge-destructive">
                         Suspended
                       </span>
                     ) : null}

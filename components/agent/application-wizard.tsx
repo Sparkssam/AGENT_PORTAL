@@ -35,6 +35,7 @@ import { saveDraft, submitApplication } from "@/lib/actions/applications"
 import { upsertDeposit } from "@/lib/actions/deposits"
 import { DocumentUploadDialog } from "@/components/documents/document-upload-dialog"
 import { SupportingDocumentsList } from "@/components/documents/supporting-documents-list"
+import { HelpHint } from "@/components/help/help-hint"
 import { documentSlotProgress, isFilledDocumentStatus } from "@/lib/documents/catalog"
 import {
   BUSINESS_SECTORS,
@@ -44,6 +45,7 @@ import {
   CHANNEL_PARENT_TYPE,
   CHANNEL_TIER,
   ID_TYPES,
+  NETWORK_CHANNELS,
   isAllowedIdType,
   isChannelManagerType,
 } from "@/lib/lookups/catalog"
@@ -57,11 +59,24 @@ const steps = [
 
 const skipWizardGates = process.env.NODE_ENV === "development"
 
-const defaultChannels = [
-  { id: "M-Pesa", name: "M-Pesa", code: "mpesa" },
-  { id: "Tigo Pesa", name: "Tigo Pesa", code: "tigopesa" },
-  { id: "Airtel Money", name: "Airtel Money", code: "airtel" },
-]
+function mergeNetworkChannels(lookups: LookupItem[]) {
+  return NETWORK_CHANNELS.map((network) => {
+    const found = lookups.find((item) => {
+      const name = item.name.toLowerCase()
+      const code = item.code.toLowerCase()
+      return (
+        name === network.name.toLowerCase() ||
+        code === network.code.toLowerCase() ||
+        network.aliases.some((alias) => alias.toLowerCase() === name)
+      )
+    })
+    return {
+      id: found?.id ?? network.name,
+      name: network.name,
+      code: found?.code ?? network.code,
+    }
+  })
+}
 
 const defaultSectors = BUSINESS_SECTORS.map((item) => ({
   id: item.code,
@@ -164,7 +179,7 @@ export function ApplicationWizard({
   live?: boolean
 }) {
   const router = useRouter()
-  const channels = lookups?.channels.length ? lookups.channels : defaultChannels
+  const channels = mergeNetworkChannels(lookups?.channels ?? [])
   const sectors = lookups?.sectors.length ? lookups.sectors : defaultSectors
   const defaultSectorId = sectors.find((item) => item.code === "all")?.id ?? sectors[0]?.id ?? ""
   const [step, setStep] = useState(1)
@@ -452,7 +467,7 @@ export function ApplicationWizard({
 
   if (submitted) {
     return (
-      <div className="mx-auto flex max-w-2xl flex-col items-center gap-4 rounded-xl border border-border bg-card p-10 text-center">
+      <div className="mx-auto flex max-w-2xl flex-col items-center gap-4 rounded-3xl bg-card p-10 text-center shadow-sm ring-1 ring-border/60">
         <span className="flex size-14 items-center justify-center rounded-full bg-success/15 text-success">
           <CheckCircle2 className="size-7" />
         </span>
@@ -490,7 +505,7 @@ export function ApplicationWizard({
         current={step}
       />
 
-      <div className="rounded-xl border border-border bg-card shadow-sm">
+      <div className="rounded-3xl bg-card shadow-sm ring-1 ring-border/60">
         {step === 1 && (
           <div className="flex flex-col gap-10 p-8 md:p-10">
             <section className="flex flex-col gap-6">
@@ -755,7 +770,7 @@ export function ApplicationWizard({
                 </Field>
               </div>
 
-              <div className="flex flex-col gap-3 rounded-lg border border-border p-4 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex flex-col gap-3 rounded-3xl bg-secondary/50 p-4 sm:flex-row sm:items-center sm:justify-between">
                 <div className="min-w-0">
                   <p className="text-xs font-medium tracking-wider text-muted-foreground uppercase">GPS coordinates</p>
                   {capturedLocation ? (
@@ -787,7 +802,7 @@ export function ApplicationWizard({
               photos and the agreement contract are not checked against your current address.
             </p>
             {missingRequiredDocs.length > 0 ? (
-              <div className="rounded-lg border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+              <div className="portal-callout portal-callout-destructive flex-col">
                 <p className="font-medium">
                   {missingRequiredDocs.length} required document{missingRequiredDocs.length === 1 ? "" : "s"} still
                   missing. Upload {missingRequiredDocs.length === 1 ? "it" : "them"} to continue.
@@ -810,6 +825,11 @@ export function ApplicationWizard({
                     </li>
                   ))}
                 </ul>
+                {missingRequiredDocs.some((doc) => doc.status === "rejected") ? (
+                  <a href="/agent/help#why-rejected" className="mt-2 w-fit text-xs font-semibold underline underline-offset-2">
+                    Why was this rejected?
+                  </a>
+                ) : null}
               </div>
             ) : null}
             <SupportingDocumentsList
@@ -817,6 +837,8 @@ export function ApplicationWizard({
               applicationId={applicationId}
               live={live}
               framed={false}
+              agentName={form.fullName || agent.fullName}
+              applicationNumber={application?.appNumber}
               onDocumentsChange={setDocs}
               onApplicationReady={(next) => {
                 setApplicationId(next.id)
@@ -831,7 +853,10 @@ export function ApplicationWizard({
           <div className="flex flex-col gap-6 p-8 md:p-10">
             <div className="flex items-start justify-between gap-4">
               <div>
-                <h2 className="text-lg font-semibold text-foreground">Deposit Payment</h2>
+                <h2 className="inline-flex items-center gap-1.5 text-lg font-semibold text-foreground">
+                  Deposit Payment
+                  <HelpHint articleId="deposit-steps" />
+                </h2>
                 <p className="mt-1 text-sm text-muted-foreground">
                   A refundable deposit of TZS 100,000 must be made from your registered mobile number.
                 </p>
@@ -842,7 +867,7 @@ export function ApplicationWizard({
             <div className="flex flex-col justify-between gap-3 rounded-lg bg-secondary/60 p-5 sm:flex-row sm:items-center">
               <div>
                 <p className="text-xs font-medium tracking-wider text-muted-foreground uppercase">Required amount</p>
-                <p className="mt-1 font-mono text-3xl font-semibold tracking-tight text-foreground">
+                <p className="mt-1 font-mono text-2xl font-medium tabular-nums tracking-tight text-foreground">
                   {formatCurrencyTZS(100000)}
                 </p>
               </div>
@@ -902,7 +927,7 @@ export function ApplicationWizard({
             </div>
 
             {!canSubmit ? (
-              <div className="flex flex-col gap-2 rounded-lg border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+              <div className="portal-callout portal-callout-destructive flex-col">
                 <p className="font-medium">
                   Action required
                   {missingRequiredDocs.length > 0
@@ -954,7 +979,7 @@ export function ApplicationWizard({
                 </ReviewCard>
               </div>
 
-              <div className="rounded-lg border border-border bg-card">
+              <div className="portal-table">
                 <div className="flex items-center justify-between border-b border-border px-4 py-3">
                   <h3 className="text-sm font-semibold text-foreground">Documents</h3>
                   <span className="text-xs text-muted-foreground">
@@ -1116,7 +1141,7 @@ export function ApplicationWizard({
 
 function ReviewCard({ title, onEdit, children }: { title: string; onEdit: () => void; children: ReactNode }) {
   return (
-    <section className="rounded-lg border border-border">
+    <section className="rounded-3xl ring-1 ring-border/60">
       <header className="flex items-center justify-between border-b border-border px-4 py-3">
         <h3 className="text-sm font-semibold text-foreground">{title}</h3>
         <Button type="button" variant="ghost" size="sm" onClick={onEdit}>
@@ -1131,7 +1156,7 @@ function ReviewCard({ title, onEdit, children }: { title: string; onEdit: () => 
 
 function ReviewItem({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-lg border border-border p-3">
+    <div className="rounded-2xl ring-1 ring-border/60 p-3">
       <p className="text-xs font-medium tracking-wider text-muted-foreground uppercase">{label}</p>
       <p className="mt-0.5 text-sm text-foreground">{value}</p>
     </div>

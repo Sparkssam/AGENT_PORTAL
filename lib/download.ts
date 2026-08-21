@@ -7,13 +7,16 @@ export async function downloadFile(url: string, filename: string) {
     const res = await fetch(url)
     if (!res.ok) throw new Error(`Failed to fetch document (${res.status})`)
     const blob = await res.blob()
-    const objectUrl = URL.createObjectURL(blob)
-    triggerAnchorDownload(objectUrl, filename)
-    URL.revokeObjectURL(objectUrl)
+    downloadBlob(blob, filename)
   } catch {
-    // Fallback: let the browser handle it directly (e.g. cross-origin assets).
     triggerAnchorDownload(url, filename, true)
   }
+}
+
+export function downloadBlob(blob: Blob, filename: string) {
+  const objectUrl = URL.createObjectURL(blob)
+  triggerAnchorDownload(objectUrl, filename)
+  URL.revokeObjectURL(objectUrl)
 }
 
 function triggerAnchorDownload(href: string, filename: string, newTab = false) {

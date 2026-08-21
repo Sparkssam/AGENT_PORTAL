@@ -9,14 +9,10 @@ import { cn } from "@/lib/utils"
 import type { Application, Document } from "@/lib/admin-data"
 import type { DocumentVerificationResult } from "@/lib/verification/types"
 import { saveDraft } from "@/lib/actions/applications"
-import {
-  DOCUMENT_ACCEPT,
-  DOCUMENT_TYPE_OPTIONS,
-  documentTypeLabel,
-  formatBytes,
-  mimeFromFile,
-  validateUploadFile,
-} from "@/lib/documents/catalog"
+import { DOCUMENT_ACCEPT, DOCUMENT_TYPE_OPTIONS, documentTypeLabel, formatBytes, mimeFromFile, validateUploadFile } from "@/lib/documents/catalog"
+import { DocumentExampleArt } from "@/components/help/document-example-art"
+import { getDocumentExample } from "@/lib/help/document-examples"
+import { helpHref } from "@/lib/help/faq"
 
 type UploadPhase = "idle" | "uploading" | "success" | "error"
 
@@ -52,6 +48,7 @@ export function DocumentUploadDialog({
   documents,
   initialType,
   live,
+  intent = "default",
   onComplete,
   onApplicationReady,
 }: {
@@ -61,6 +58,7 @@ export function DocumentUploadDialog({
   documents: Document[]
   initialType?: string
   live?: boolean
+  intent?: "default" | "onBehalf" | "replace"
   onComplete: (documents: Document[], verification?: DocumentVerificationResult) => void
   onApplicationReady?: (application: Application) => void
 }) {
@@ -98,7 +96,7 @@ export function DocumentUploadDialog({
     setPhase("idle")
     setProgress(0)
     setError(null)
-  }, [open, initialType])
+  }, [open, initialType, intent])
 
   function closeModal() {
     if (phase === "uploading") return
@@ -145,9 +143,19 @@ export function DocumentUploadDialog({
       window.setTimeout(() => {
         setProgress(100)
         setPhase("success")
+        const autoAccept = intent === "onBehalf" || (intent === "replace" && existing?.adminUploaded)
         onComplete(
           documents.map((doc) =>
-            doc.type === documentType ? { ...doc, status: "unverified", originalName: file.name, fileSize: file.size } : doc,
+            doc.type === documentType
+              ? {
+                  ...doc,
+                  status: autoAccept ? "verified" : "unverified",
+                  originalName: file.name,
+                  fileSize: file.size,
+                  adminUploaded: autoAccept,
+                  verifiedBy: autoAccept ? "Admin upload" : undefined,
+                }
+              : doc,
           ),
         )
         window.setTimeout(() => onOpenChange(false), 1100)
@@ -175,7 +183,8 @@ export function DocumentUploadDialog({
       body.set("mimeType", mimeFromFile(file))
       body.set("fileSize", String(file.size))
       body.set("uploadedAt", new Date().toISOString())
-      if (alreadyStored || replacingRejected) body.set("replace", "true")
+      if (alreadyStored || replacingRejected || intent === "replace" || intent === "onBehalf") body.set("replace", "true")
+      if (intent === "onBehalf") body.set("onBehalf", "true")
 
       const result = await uploadWithProgress(body, setProgress)
       setProgress(100)
@@ -205,9 +214,17 @@ export function DocumentUploadDialog({
             <CloudUpload className="size-4" />
           </span>
           <div className="min-w-0 flex-1">
-            <DialogTitle className="text-[15px] font-semibold">Upload files</DialogTitle>
+            <DialogTitle className="text-[15px] font-semibold">
+              {intent === "onBehalf" ? "Upload on behalf of agent" : intent === "replace" ? "Replace document" : "Upload files"}
+            </DialogTitle>
             <DialogDescription className="mt-0.5 text-xs">
-              Select and upload the files of your choice
+              {intent === "onBehalf"
+                ? "This file is stored as accepted (admin-uploaded) and is logged in the audit trail."
+                : intent === "replace"
+                  ? existing?.adminUploaded
+                    ? "Replacing an admin-uploaded file keeps it accepted."
+                    : "Replacing an accepted agent file sends it back to pending review."
+                  : "Select and upload the files of your choice"}
             </DialogDescription>
           </div>
           <Button
@@ -248,8 +265,29 @@ export function DocumentUploadDialog({
                 </option>
               ))}
             </select>
+            {documentType ? (
+              <div className="mt-1 flex items-center gap-3 rounded-xl bg-secondary/60 p-2.5">
+                <span className="overflow-hidden rounded-lg ring-1 ring-border">
+                  <DocumentExampleArt type={documentType} className="h-14 w-20" />
+                </span>
+                <div className="min-w-0">
+                  <p className="text-xs font-medium text-foreground">
+                    {getDocumentExample(documentType)?.caption ?? "Valid example"}
+                  </p>
+                  <p className="text-xs text-muted-foreground">{getDocumentExample(documentType)?.hint}</p>
+                  <a href={helpHref("valid-photos")} className="text-[11px] font-medium underline-offset-2 hover:underline">
+                    Photo guide
+                  </a>
+                </div>
+              </div>
+            ) : null}
             {existing?.status === "rejected" && existing.reason ? (
-              <p className="text-xs text-destructive">{existing.reason}</p>
+              <p className="text-xs text-destructive">
+                {existing.reason}{" "}
+                <a href={helpHref("why-rejected")} className="font-medium underline underline-offset-2">
+                  Why was this rejected?
+                </a>
+              </p>
             ) : alreadyStored ? (
               <p className="text-xs text-muted-foreground">
                 {documentTypeLabel(documentType)} is already on file. Submitting a new file will replace it.

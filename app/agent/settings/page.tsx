@@ -7,10 +7,8 @@ export default async function AgentSettingsPage() {
   const { mode, message, agent, application } = await loadAgentWorkspace()
 
   return (
-    <>
-      <div className="px-4 pt-4 md:px-8">
-        <SetupBanner mode={mode} message={message} />
-      </div>
+    <div className="portal-page">
+      <SetupBanner mode={mode} message={message} />
       <SettingsWorkspace
         portal="agent"
         email={agent.email}
@@ -20,6 +18,6 @@ export default async function AgentSettingsPage() {
         memberSince={formatDateLong(agent.memberSince)}
         verified={agent.verified}
       />
-    </>
+    </div>
   )
 }

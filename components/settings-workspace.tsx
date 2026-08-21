@@ -16,6 +16,7 @@ import { WorkspaceSearch } from "@/components/workspace-search"
 import { SettingsForm } from "@/app/agent/settings/settings-form"
 import { AppStatusBadge } from "@/components/admin/status-badge"
 import { PageBackLink } from "@/components/page-back-link"
+import { PageHeader } from "@/components/page-header"
 import { statusLabels, type AppStatus } from "@/lib/domain"
 import { cn } from "@/lib/utils"
 
@@ -41,7 +42,7 @@ function SummaryCard({
   icon: typeof Mail
 }) {
   return (
-    <div className="rounded-2xl border border-border bg-card p-4">
+    <div className="portal-stat-card">
       <div className="flex items-start justify-between gap-3">
         <p className="text-sm text-muted-foreground">{label}</p>
         <Icon className="size-4 text-muted-foreground/70" />
@@ -73,7 +74,7 @@ function SettingsRowCard({ row }: { row: SettingsRow }) {
       <li>
         <Link
           href={row.href}
-          className="flex items-center gap-3 rounded-2xl border border-border bg-card px-4 py-3.5 transition hover:bg-muted/40"
+          className="flex items-center gap-3 rounded-3xl bg-card px-4 py-3.5 shadow-sm ring-1 ring-border/60 transition hover:bg-muted/40"
         >
           {inner}
         </Link>
@@ -82,7 +83,7 @@ function SettingsRowCard({ row }: { row: SettingsRow }) {
   }
 
   return (
-    <li className="flex items-center gap-3 rounded-2xl border border-border bg-card px-4 py-3.5">
+    <li className="flex items-center gap-3 rounded-3xl bg-card px-4 py-3.5 shadow-sm ring-1 ring-border/60">
       {inner}
     </li>
   )
@@ -158,19 +159,20 @@ export function SettingsWorkspace({
   })
 
   return (
-    <div className="mx-auto flex max-w-5xl flex-col gap-6 p-4 md:px-8 md:py-6">
-      <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-        <div>
-          <PageBackLink fallback={isAgent ? "/agent/dashboard" : "/admin/dashboard"} />
-          <h1 className="mt-2 text-3xl font-semibold tracking-tight text-foreground">Settings</h1>
-        </div>
-        <WorkspaceSearch
-          value={query}
-          onChange={setQuery}
-          placeholder="Search settings..."
-          className="md:max-w-xs"
-        />
-      </div>
+    <>
+      <PageHeader
+        back={<PageBackLink fallback={isAgent ? "/agent/dashboard" : "/admin/dashboard"} />}
+        title="Settings"
+        description="Account, password, and notification preferences."
+        action={
+          <WorkspaceSearch
+            value={query}
+            onChange={setQuery}
+            placeholder="Search settings..."
+            className="w-full sm:w-72"
+          />
+        }
+      />
 
       <Tabs defaultValue="account" className="gap-5">
         <TabsList variant="line" className="h-auto w-full justify-start gap-4 overflow-x-auto bg-transparent p-0">
@@ -225,7 +227,7 @@ export function SettingsWorkspace({
             </p>
             <ul className="flex flex-col gap-2">
               {filtered.length === 0 ? (
-                <li className="rounded-2xl border border-dashed border-border px-4 py-8 text-center text-sm text-muted-foreground">
+                <li className="rounded-3xl border border-dashed border-border px-4 py-8 text-center text-sm text-muted-foreground">
                   No settings match that search.
                 </li>
               ) : (
@@ -236,7 +238,7 @@ export function SettingsWorkspace({
         </TabsContent>
 
         <TabsContent value="password" className="flex flex-col gap-4">
-          <div className="rounded-2xl border border-border bg-card p-5">
+          <div className="portal-card">
             <div className="mb-4 flex items-center gap-3">
               <span className="flex size-10 items-center justify-center rounded-full bg-muted">
                 <KeyRound className="size-4" />
@@ -255,7 +257,7 @@ export function SettingsWorkspace({
         </TabsContent>
 
         <TabsContent value="notifications" className="flex flex-col gap-4">
-          <div className="rounded-2xl border border-border bg-card p-5">
+          <div className="portal-card">
             <div className="mb-3 flex items-center gap-3">
               <span className="flex size-10 items-center justify-center rounded-full bg-muted">
                 <Bell className="size-4" />
@@ -282,7 +284,7 @@ export function SettingsWorkspace({
 
         {isAgent ? (
           <TabsContent value="profile" className="flex flex-col gap-4">
-            <div className="rounded-2xl border border-border bg-card p-5">
+            <div className="portal-card">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div className="flex items-center gap-3">
                   <span className="flex size-10 items-center justify-center rounded-full bg-muted">
@@ -311,6 +313,6 @@ export function SettingsWorkspace({
           </TabsContent>
         ) : null}
       </Tabs>
-    </div>
+    </>
   )
 }

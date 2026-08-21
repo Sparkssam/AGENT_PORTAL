@@ -53,12 +53,19 @@ export default function ForgotPasswordPage() {
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             required
-            className="h-10"
           />
         </div>
-        {error && <p className="text-sm text-destructive">{error}</p>}
-        {message && <p className="text-sm text-foreground">{message}</p>}
-        <Button type="submit" size="lg" className="h-10 w-full" disabled={loading}>
+        {error && (
+          <p role="alert" className="portal-callout portal-callout-destructive">
+            {error}
+          </p>
+        )}
+        {message && (
+          <p role="status" className="portal-callout portal-callout-success">
+            {message}
+          </p>
+        )}
+        <Button type="submit" size="lg" className="w-full" disabled={loading}>
           {loading ? <Loader2 className="size-4 animate-spin" /> : "Send reset link"}
         </Button>
       </form>

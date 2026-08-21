@@ -15,6 +15,9 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { DocumentUploadDialog } from "@/components/documents/document-upload-dialog"
+import { DocumentExampleThumb } from "@/components/help/document-example-thumb"
+import { HelpHint } from "@/components/help/help-hint"
+import { RejectedDocumentHelp } from "@/components/help/rejected-document-help"
 import { getDocumentFile, type Application, type AppStatus, type Document } from "@/lib/domain"
 import { saveDraft } from "@/lib/actions/applications"
 import { clearDocumentFile, signedGet } from "@/lib/actions/documents"
@@ -28,10 +31,10 @@ import {
 import { cn } from "@/lib/utils"
 
 const cardBadgeClass: Record<"EMPTY" | "REJECTED" | "INCOMPLETE" | "COMPLETE", string> = {
-  EMPTY: "border-border bg-muted text-muted-foreground",
-  REJECTED: "border-destructive/30 bg-destructive/10 text-destructive",
-  INCOMPLETE: "border-border bg-muted text-muted-foreground",
-  COMPLETE: "border-success/30 bg-success/15 text-success",
+  EMPTY: "status-badge-muted",
+  REJECTED: "status-badge-destructive",
+  INCOMPLETE: "status-badge-muted",
+  COMPLETE: "status-badge-success",
 }
 
 export function SupportingDocumentsList({
@@ -42,6 +45,8 @@ export function SupportingDocumentsList({
   applicationStatus,
   includeDepositProof = false,
   framed = true,
+  agentName,
+  applicationNumber,
   onDocumentsChange,
   onApplicationReady,
   onError,
@@ -53,6 +58,8 @@ export function SupportingDocumentsList({
   applicationStatus?: AppStatus
   includeDepositProof?: boolean
   framed?: boolean
+  agentName?: string
+  applicationNumber?: string
   onDocumentsChange: (documents: Document[]) => void
   onApplicationReady?: (application: Application) => void
   onError?: (message: string | null) => void
@@ -141,18 +148,14 @@ export function SupportingDocumentsList({
   }
 
   return (
-    <div className={cn(framed && "rounded-xl border border-border bg-card")}>
+    <div className={cn(framed && "overflow-hidden rounded-3xl bg-card shadow-sm ring-1 ring-border/60")}>
       <div className="flex items-center justify-between gap-3 border-b border-border px-5 py-4">
         <div className="flex items-center gap-2.5">
           <FolderOpen className="size-5 text-muted-foreground" />
           <h2 className="text-base font-semibold text-foreground">Supporting Documents</h2>
+          <HelpHint articleId="valid-photos" label="What a valid document photo looks like" />
         </div>
-        <span
-          className={cn(
-            "inline-flex h-5 items-center rounded-md px-2 text-[10px] font-semibold tracking-wider uppercase",
-            cardBadgeClass[progress.cardStatus],
-          )}
-        >
+        <span className={cn("status-badge", cardBadgeClass[progress.cardStatus])}>
           {progress.cardStatus}
         </span>
       </div>
@@ -176,10 +179,12 @@ export function SupportingDocumentsList({
               key={doc.type}
               id={`document-slot-${doc.type}`}
               className={cn(
-                "flex items-center gap-3 px-5 py-3.5",
+                "flex flex-col gap-2 px-5 py-3.5",
                 problem && "bg-destructive/10 ring-1 ring-inset ring-destructive/40",
               )}
             >
+              <div className="flex items-center gap-3">
+              <DocumentExampleThumb type={doc.type} />
               {filled ? (
                 <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-success text-white">
                   <Check className="size-3.5" />
@@ -255,6 +260,16 @@ export function SupportingDocumentsList({
                   </Button>
                 </div>
               )}
+              </div>
+              {rejected ? (
+                <RejectedDocumentHelp
+                  agentName={agentName}
+                  applicationNumber={applicationNumber}
+                  documentType={doc.type}
+                  documentName={doc.name}
+                  reason={doc.reason}
+                />
+              ) : null}
             </li>
           )
         })}

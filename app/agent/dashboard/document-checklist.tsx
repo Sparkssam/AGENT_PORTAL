@@ -5,6 +5,8 @@ import Link from "next/link"
 import { ArrowRight, Circle, Upload } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { DocumentUploadDialog } from "@/components/documents/document-upload-dialog"
+import { DocumentExampleThumb } from "@/components/help/document-example-thumb"
+import { RejectedDocumentHelp } from "@/components/help/rejected-document-help"
 import { documentChecklistProgress } from "@/lib/agent-data"
 import { canAgentChangeDocument } from "@/lib/backend/status"
 import type { Application, Document } from "@/lib/admin-data"
@@ -29,9 +31,9 @@ export function AgentDocumentChecklist({
   }
 
   return (
-    <section className="rounded-[1.75rem] bg-card p-6 shadow-sm ring-1 ring-border/60">
+    <section className="portal-card">
       <div className="flex items-center justify-between gap-3">
-        <p className="font-semibold text-2xl text-foreground">To-do</p>
+        <p className="portal-section-title">To-do</p>
         <Link href="/agent/apply" className="text-muted-foreground hover:text-foreground">
           <ArrowRight className="size-4" />
         </Link>
@@ -44,7 +46,9 @@ export function AgentDocumentChecklist({
           const done = doc.status !== "missing" && doc.status !== "rejected"
           const canFix = !locked && canAgentChangeDocument(application.status, doc.required !== false)
           return (
-            <li key={doc.id} className="flex items-start gap-3 rounded-2xl px-1 py-2.5">
+            <li key={doc.id} className="flex flex-col gap-1 rounded-2xl px-1 py-2.5">
+              <div className="flex items-start gap-3">
+              <DocumentExampleThumb type={doc.type} className="mt-0.5" />
               <button
                 type="button"
                 disabled={!canFix || done}
@@ -72,6 +76,16 @@ export function AgentDocumentChecklist({
                   {doc.status === "rejected" ? "Re-upload" : "Upload"}
                 </Button>
               )}
+              </div>
+              {doc.status === "rejected" ? (
+                <RejectedDocumentHelp
+                  agentName={app.agentName}
+                  applicationNumber={app.appNumber}
+                  documentType={doc.type}
+                  documentName={doc.name}
+                  reason={doc.reason}
+                />
+              ) : null}
             </li>
           )
         })}

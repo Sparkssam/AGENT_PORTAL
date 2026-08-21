@@ -23,6 +23,7 @@ export {
   depositLabels,
   getDocumentFile,
   sanitizeFileToken,
+  storedDocumentFileName,
   statusLabels,
 } from "@/lib/domain"
 import type { Agent, Application, AuditLogEntry, Document, DocumentStatus, TimelineEvent } from "@/lib/domain"

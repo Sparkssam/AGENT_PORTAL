@@ -55,8 +55,22 @@ export function isNewApplicant(apps: Application[]) {
 export type WorkspaceMode = "live" | "setup"
 
 function setupFrom(error: unknown) {
-  const message = error instanceof Error ? error.message : "Backend is not ready"
-  return { mode: "setup" as const, message }
+  const raw = error instanceof Error ? error.message : "Backend is not ready"
+  if (/can't reach database server|timed out|P1001/i.test(raw)) {
+    return {
+      mode: "setup" as const,
+      message:
+        "Cannot reach Postgres. Use the Supabase pooler: DATABASE_URL on port 6543 with ?pgbouncer=true&sslmode=require, and DIRECT_URL on port 5432 with sslmode=require. Confirm the project is not paused.",
+    }
+  }
+  if (/does not exist|schema cache|P2021|relation .* does not exist/i.test(raw)) {
+    return {
+      mode: "setup" as const,
+      message:
+        "Supabase is configured but the schema is missing. Apply SQL in order from .env.example (init, seed, storage, mutation_guards, document_verifications, business_sectors, document_admin_upload).",
+    }
+  }
+  return { mode: "setup" as const, message: raw }
 }
 
 function emptyAgent(): AgentProfile {
@@ -79,6 +93,7 @@ export function emptyApplication(agent: AgentProfile): Application {
   return {
     id: "draft",
     agentId: agent.id,
+    agentCode: agent.agentIdNumber,
     appNumber: "DRAFT",
     agentName: agent.fullName,
     phone: agent.phone,

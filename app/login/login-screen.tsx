@@ -124,7 +124,7 @@ export function LoginScreen({ initialMode = "signin" }: { initialMode?: "signin"
             setMode("signin")
           }}
           className={cn(
-            "rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
+            "rounded-full px-3 py-1.5 text-sm font-medium transition-colors",
             mode === "signin" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground",
           )}
         >
@@ -138,7 +138,7 @@ export function LoginScreen({ initialMode = "signin" }: { initialMode?: "signin"
             setMode("signup")
           }}
           className={cn(
-            "rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
+            "rounded-full px-3 py-1.5 text-sm font-medium transition-colors",
             mode === "signup" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground",
           )}
         >
@@ -158,7 +158,6 @@ export function LoginScreen({ initialMode = "signin" }: { initialMode?: "signin"
               onChange={(e) => setEmail(e.target.value)}
               required
               autoComplete="username"
-              className="h-10"
             />
           </div>
 
@@ -178,12 +177,12 @@ export function LoginScreen({ initialMode = "signin" }: { initialMode?: "signin"
                 onChange={(e) => setPassword(e.target.value)}
                 required
                 autoComplete="current-password"
-                className="h-10 pr-10"
+                className="pr-10"
               />
               <button
                 type="button"
                 onClick={() => setShowPassword((v) => !v)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                className="absolute right-1.5 top-1/2 flex size-8 -translate-y-1/2 items-center justify-center rounded-full text-muted-foreground hover:bg-muted hover:text-foreground"
                 aria-label={showPassword ? "Hide password" : "Show password"}
               >
                 {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
@@ -192,26 +191,20 @@ export function LoginScreen({ initialMode = "signin" }: { initialMode?: "signin"
           </div>
 
           {notice && (
-            <p
-              role="status"
-              className="flex items-start gap-2 rounded-lg border border-success/25 bg-success/10 px-3 py-2.5 text-sm text-foreground"
-            >
+            <p role="status" className="portal-callout portal-callout-success">
               <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-success" />
               {notice}
             </p>
           )}
 
           {error && (
-            <p
-              role="alert"
-              className="flex items-start gap-2 rounded-lg border border-destructive/25 bg-destructive/10 px-3 py-2.5 text-sm text-destructive"
-            >
+            <p role="alert" className="portal-callout portal-callout-destructive">
               <AlertCircle className="mt-0.5 size-4 shrink-0" />
               {error}
             </p>
           )}
 
-          <Button type="submit" size="lg" className="mt-1 h-10 w-full" disabled={loading}>
+          <Button type="submit" size="lg" className="mt-1 w-full" disabled={loading}>
             {loading ? (
               <>
                 <Loader2 className="size-4 animate-spin" />
@@ -236,7 +229,6 @@ export function LoginScreen({ initialMode = "signin" }: { initialMode?: "signin"
               onChange={(e) => setFullName(e.target.value)}
               required
               autoComplete="name"
-              className="h-10"
             />
           </div>
 
@@ -250,7 +242,6 @@ export function LoginScreen({ initialMode = "signin" }: { initialMode?: "signin"
               onChange={(e) => setPhone(e.target.value)}
               required
               autoComplete="tel"
-              className="h-10"
             />
           </div>
 
@@ -264,7 +255,6 @@ export function LoginScreen({ initialMode = "signin" }: { initialMode?: "signin"
               onChange={(e) => setEmail(e.target.value)}
               required
               autoComplete="email"
-              className="h-10"
             />
           </div>
 
@@ -280,7 +270,6 @@ export function LoginScreen({ initialMode = "signin" }: { initialMode?: "signin"
                 required
                 minLength={8}
                 autoComplete="new-password"
-                className="h-10"
               />
             </div>
             <div className="flex flex-col gap-1.5">
@@ -294,16 +283,12 @@ export function LoginScreen({ initialMode = "signin" }: { initialMode?: "signin"
                 required
                 minLength={8}
                 autoComplete="new-password"
-                className="h-10"
               />
             </div>
           </div>
 
           {error && (
-            <p
-              role="alert"
-              className="flex items-start gap-2 rounded-lg border border-destructive/25 bg-destructive/10 px-3 py-2.5 text-sm text-destructive"
-            >
+            <p role="alert" className="portal-callout portal-callout-destructive">
               <AlertCircle className="mt-0.5 size-4 shrink-0" />
               {error}
             </p>
@@ -314,7 +299,7 @@ export function LoginScreen({ initialMode = "signin" }: { initialMode?: "signin"
             <span>I agree to the Terms and Conditions and Privacy Policy.</span>
           </label>
 
-          <Button type="submit" size="lg" className="mt-1 h-10 w-full" disabled={loading || !agreed}>
+          <Button type="submit" size="lg" className="mt-1 w-full" disabled={loading || !agreed}>
             {loading ? (
               <>
                 <Loader2 className="size-4 animate-spin" />

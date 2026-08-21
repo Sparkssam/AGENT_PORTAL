@@ -4,7 +4,6 @@ import { useState } from "react"
 import Link from "next/link"
 import Image from "next/image"
 import {
-  ArrowLeft,
   Printer,
   Share2,
   ClipboardCopy,
@@ -21,6 +20,8 @@ import {
   Upload,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { PageHeader } from "@/components/page-header"
+import { PageBackLink } from "@/components/page-back-link"
 import {
   Select,
   SelectContent,
@@ -216,40 +217,25 @@ export function ApplicationReview({
 
   return (
     <div className="absolute inset-0 flex min-h-0 flex-col">
-      <div className="mx-auto flex min-h-0 w-full max-w-[1400px] flex-1 flex-col gap-6 overflow-y-auto p-4 md:p-6">
-      <div className="flex flex-col gap-3">
-        <Link
-          href="/admin/applications"
-          className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
-        >
-          <ArrowLeft className="size-4" />
-          Back to Applications
-        </Link>
-
-        <div className="flex flex-wrap items-start justify-between gap-4">
-          <div className="flex flex-wrap items-center gap-3">
-            <span className="flex size-10 items-center justify-center rounded-md bg-secondary text-foreground">
-              <FileText className="size-5" />
-            </span>
-            <div>
-              <div className="flex items-center gap-2">
-                <h1 className="font-mono text-xl font-semibold text-foreground">{application.appNumber}</h1>
-                <AppStatusBadge status={status} />
-              </div>
-              <p className="mt-0.5 text-sm text-muted-foreground">
-                {application.agentName}
-                {application.businessName ? ` · ${application.businessName}` : ""} · Submitted{" "}
-                {new Date(application.submittedAt).toLocaleString("en-GB", {
-                  day: "2-digit",
-                  month: "short",
-                  year: "numeric",
-                  hour: "2-digit",
-                  minute: "2-digit",
-                })}
-              </p>
-            </div>
-          </div>
-          <div className="flex gap-2">
+      <div className="portal-page min-h-0 flex-1 overflow-y-auto">
+      <PageHeader
+        back={<PageBackLink fallback="/admin/applications" label="Back to Applications" />}
+        title={
+          <span className="flex flex-wrap items-center gap-3">
+            {application.appNumber}
+            <AppStatusBadge status={status} />
+          </span>
+        }
+        mono
+        description={`${application.agentName}${application.businessName ? ` · ${application.businessName}` : ""} · Submitted ${new Date(application.submittedAt).toLocaleString("en-GB", {
+          day: "2-digit",
+          month: "short",
+          year: "numeric",
+          hour: "2-digit",
+          minute: "2-digit",
+        })}`}
+        action={
+          <div className="flex flex-wrap gap-2">
             <Button variant="outline" onClick={() => window.print()}>
               <Printer data-icon="inline-start" />
               Print
@@ -259,15 +245,15 @@ export function ApplicationReview({
               {copiedShare ? "Link copied" : "Share"}
             </Button>
           </div>
-        </div>
-      </div>
+        }
+      />
 
       <CaseHealthCard application={application} showNextAction={false} />
 
       {duplicates.length > 0 && (
-        <div className="rounded-lg border border-warning/40 bg-warning/10 px-5 py-4">
-          <p className="text-sm font-semibold text-warning-foreground">Possible duplicate applications</p>
-          <p className="mt-1 text-sm text-warning-foreground/80">
+        <div className="portal-callout portal-callout-warning flex-col">
+          <p className="text-sm font-semibold text-foreground">Possible duplicate applications</p>
+          <p className="text-sm text-muted-foreground">
             Matching phone, ID number, or TIN already exists on another case. Review before completing onboarding.
           </p>
           <ul className="mt-3 flex flex-col gap-2">
@@ -289,9 +275,9 @@ export function ApplicationReview({
         </div>
       )}
 
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_320px]">
-        <div className="flex flex-col gap-6">
-          <section className="rounded-lg border border-border bg-card">
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-[1fr_320px]">
+        <div className="flex flex-col gap-5">
+          <section className="portal-table">
             <header className="flex items-center gap-2 border-b border-border px-5 py-4">
               <span className="text-base font-semibold text-foreground">Channel Declaration</span>
             </header>
@@ -319,7 +305,7 @@ export function ApplicationReview({
             </div>
           </section>
 
-          <section className="rounded-lg border border-border bg-card">
+          <section className="portal-table">
             <header className="flex items-center gap-2 border-b border-border px-5 py-4">
               <span className="text-base font-semibold text-foreground">Contact Information</span>
             </header>
@@ -346,7 +332,7 @@ export function ApplicationReview({
             </div>
           </section>
 
-          <section className="rounded-lg border border-border bg-card">
+          <section className="portal-table">
             <header className="flex items-center gap-2 border-b border-border px-5 py-4">
               <span className="text-base font-semibold text-foreground">Deposit</span>
               <DepositStatusBadge status={application.depositStatus} className="ml-2" />
@@ -399,7 +385,7 @@ export function ApplicationReview({
             )}
           </section>
 
-          <section className="overflow-hidden rounded-lg border border-border bg-card">
+          <section className="portal-table">
             <header className="flex items-center justify-between gap-2 border-b border-border px-5 py-4">
               <span className="text-base font-semibold text-foreground">Supporting Documents</span>
               <div className="flex items-center gap-2">
@@ -527,7 +513,7 @@ export function ApplicationReview({
             {copiedAll ? "Copied to clipboard" : "Copy All Details"}
           </Button>
 
-          <div className="rounded-lg border border-border bg-card p-4">
+          <div className="portal-card">
             <p className="mb-2 text-xs font-medium tracking-wide text-muted-foreground uppercase">Review Status</p>
             <Select value={status} onValueChange={(v) => void changeStatus(v as AppStatus)}>
               <SelectTrigger className="w-full">
@@ -592,7 +578,7 @@ export function ApplicationReview({
             </Dialog>
           </div>
 
-          <div className="rounded-lg border border-border bg-card">
+          <div className="portal-table">
             <p className="border-b border-border px-4 py-3 text-sm font-semibold text-foreground">Activity Timeline</p>
             <ul className="flex flex-col gap-4 p-4">
               {application.timeline.map((event, i) => (
@@ -621,7 +607,7 @@ export function ApplicationReview({
         aria-label="Application actions"
         className="relative z-20 shrink-0 px-3 pt-2 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:px-4 md:px-6"
       >
-        <div className="mx-auto flex max-w-[1400px] flex-col items-stretch gap-3 rounded-2xl border border-border bg-card p-3 shadow-lg sm:flex-row sm:items-center sm:justify-between sm:px-4">
+        <div className="mx-auto flex max-w-[1400px] flex-col items-stretch gap-3 rounded-3xl bg-card p-3 shadow-md ring-1 ring-border/60 sm:flex-row sm:items-center sm:justify-between sm:px-4">
           <div className="flex min-w-0 flex-wrap items-center gap-2 text-sm text-muted-foreground sm:gap-3">
             {error && <span className="text-destructive">{error}</span>}
             <span>

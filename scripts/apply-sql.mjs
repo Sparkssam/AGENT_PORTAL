@@ -14,6 +14,7 @@ const defaultFiles = [
   "supabase/migrations/20260817150000_mutation_guards.sql",
   "supabase/migrations/20260819120000_document_verifications.sql",
   "supabase/migrations/20260819140000_business_sectors.sql",
+  "supabase/migrations/20260821120000_document_admin_upload.sql",
 ]
 const files = process.argv.slice(2).length ? process.argv.slice(2) : defaultFiles
 

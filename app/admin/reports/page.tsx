@@ -2,11 +2,12 @@ import type { Metadata } from "next"
 import dynamic from "next/dynamic"
 import { FileStack, Clock, CheckCircle2, TrendingUp } from "lucide-react"
 import { StatCard } from "@/components/admin/stat-card"
+import { PageHeader } from "@/components/page-header"
 import { loadAdminReports } from "@/lib/data/workspace"
 import { SetupBanner } from "@/components/setup-banner"
 
 const VolumeChart = dynamic(() => import("./volume-chart").then((mod) => mod.VolumeChart), {
-  loading: () => <div className="h-[280px] animate-pulse rounded-md bg-muted" />,
+  loading: () => <div className="h-[280px] animate-pulse rounded-3xl bg-muted" />,
 })
 const BreakdownChart = dynamic(() => import("./breakdown-chart").then((mod) => mod.BreakdownChart), {
   loading: () => <div className="mx-auto aspect-square h-[200px] animate-pulse rounded-full bg-muted" />,
@@ -42,14 +43,12 @@ export default async function ReportsPage() {
       : 0
 
   return (
-    <div className="mx-auto flex max-w-[1400px] flex-col gap-6 p-4 md:p-6">
+    <div className="portal-page">
       <SetupBanner mode={mode} message={message} />
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight text-foreground md:text-3xl">Reports</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Application volume, approval performance, and channel mix for the Tanzania Hub.
-        </p>
-      </div>
+      <PageHeader
+        title="Reports"
+        description="Application volume, approval performance, and channel mix for the Tanzania Hub."
+      />
 
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
         <StatCard label="Total Applications" value={dashboardStats.totalApps} icon={FileStack} tone="default" />
@@ -58,39 +57,45 @@ export default async function ReportsPage() {
         <StatCard label="Month-over-Month" value={`${mom >= 0 ? "+" : ""}${mom}%`} icon={TrendingUp} tone="accent" />
       </div>
 
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-        <div className="rounded-lg border border-border bg-card p-5 lg:col-span-2">
-          <div className="mb-4">
-            <h2 className="text-base font-semibold text-foreground">Monthly Application Volume</h2>
-            <p className="text-sm text-muted-foreground">Submitted, in review, approved, and rejected applications by month.</p>
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
+        <div className="portal-card lg:col-span-2">
+          <div>
+            <h2 className="portal-card-title">Monthly Application Volume</h2>
+            <p className="portal-card-copy">Submitted, in review, approved, and rejected applications by month.</p>
           </div>
+          <div className="mt-5">
           <VolumeChart data={monthlyVolume} />
+          </div>
         </div>
 
-        <div className="rounded-lg border border-border bg-card p-5">
-          <div className="mb-4">
-            <h2 className="text-base font-semibold text-foreground">Applications by Sector</h2>
-            <p className="text-sm text-muted-foreground">Share of total volume.</p>
+        <div className="portal-card">
+          <div>
+            <h2 className="portal-card-title">Applications by Sector</h2>
+            <p className="portal-card-copy">Share of total volume.</p>
           </div>
+          <div className="mt-5">
           <BreakdownChart type="sector" data={sectorBreakdown.map((d) => ({ name: d.sector, value: d.value, count: d.count }))} />
+          </div>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-        <div className="rounded-lg border border-border bg-card p-5">
-          <div className="mb-4">
-            <h2 className="text-base font-semibold text-foreground">Applications by Channel</h2>
-            <p className="text-sm text-muted-foreground">Share of total volume.</p>
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
+        <div className="portal-card">
+          <div>
+            <h2 className="portal-card-title">Applications by Channel</h2>
+            <p className="portal-card-copy">Share of total volume.</p>
           </div>
+          <div className="mt-5">
           <BreakdownChart type="channel" data={channelBreakdown.map((d) => ({ name: d.channel, value: d.value, count: d.count }))} />
+          </div>
         </div>
 
-        <div className="rounded-lg border border-border bg-card p-5 lg:col-span-2">
-          <div className="mb-4">
-            <h2 className="text-base font-semibold text-foreground">Status Breakdown</h2>
-            <p className="text-sm text-muted-foreground">Current pipeline snapshot across all applications.</p>
+        <div className="portal-card lg:col-span-2">
+          <div>
+            <h2 className="portal-card-title">Status Breakdown</h2>
+            <p className="portal-card-copy">Current pipeline snapshot across all applications.</p>
           </div>
-          <div className="flex flex-col gap-3">
+          <div className="mt-5 flex flex-col gap-3">
             {[
               { label: "Submitted", value: dashboardStats.submitted, tone: "bg-muted-foreground/40" },
               { label: "In Progress", value: dashboardStats.inProgress, tone: "bg-accent" },

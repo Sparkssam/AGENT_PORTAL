@@ -1,9 +1,8 @@
 "use client"
 
 import { useMemo, useState } from "react"
-import { Search, ChevronLeft, ChevronRight, Info, TriangleAlert, ShieldAlert } from "lucide-react"
+import { Search, Info, TriangleAlert, ShieldAlert } from "lucide-react"
 import { Input } from "@/components/ui/input"
-import { Button } from "@/components/ui/button"
 import {
   Select,
   SelectContent,
@@ -13,14 +12,15 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { type AuditCategory, type AuditLogEntry, type AuditSeverity } from "@/lib/admin-data"
+import { TablePagination } from "@/components/table-pagination"
 import { cn } from "@/lib/utils"
 
 const categoryOptions: AuditCategory[] = ["Application", "Document", "Agent", "System", "Security"]
 
 const severityConfig: Record<AuditSeverity, { label: string; className: string; icon: typeof Info }> = {
-  info: { label: "Info", className: "bg-secondary text-foreground", icon: Info },
-  warning: { label: "Warning", className: "bg-chart-3/15 text-chart-3", icon: TriangleAlert },
-  critical: { label: "Critical", className: "bg-destructive/10 text-destructive", icon: ShieldAlert },
+  info: { label: "Info", className: "status-badge-muted", icon: Info },
+  warning: { label: "Warning", className: "status-badge-warning", icon: TriangleAlert },
+  critical: { label: "Critical", className: "status-badge-destructive", icon: ShieldAlert },
 }
 
 function formatTimestamp(iso: string) {
@@ -62,8 +62,8 @@ export function AuditLogTable({ entries }: { entries: AuditLogEntry[] }) {
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex flex-col gap-3 md:flex-row md:items-center">
-        <div className="relative flex-1">
+      <div className="portal-card portal-toolbar">
+        <div className="relative min-w-0 flex-1">
           <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
           <Input
             value={query}
@@ -72,10 +72,11 @@ export function AuditLogTable({ entries }: { entries: AuditLogEntry[] }) {
               setPage(1)
             }}
             placeholder="Search actor, action, target, or detail..."
+            aria-label="Search audit log"
             className="pl-9"
           />
         </div>
-        <div className="flex flex-wrap gap-2">
+        <div className="flex w-full flex-wrap gap-2 lg:w-auto">
           <Select
             value={category}
             onValueChange={(v) => {
@@ -83,7 +84,7 @@ export function AuditLogTable({ entries }: { entries: AuditLogEntry[] }) {
               setPage(1)
             }}
           >
-            <SelectTrigger className="w-[160px]">
+            <SelectTrigger className="w-full sm:w-[160px]" aria-label="Filter by category">
               <SelectValue placeholder="Category" />
             </SelectTrigger>
             <SelectContent>
@@ -105,7 +106,7 @@ export function AuditLogTable({ entries }: { entries: AuditLogEntry[] }) {
               setPage(1)
             }}
           >
-            <SelectTrigger className="w-[150px]">
+            <SelectTrigger className="w-full sm:w-[150px]" aria-label="Filter by severity">
               <SelectValue placeholder="Severity" />
             </SelectTrigger>
             <SelectContent>
@@ -120,11 +121,11 @@ export function AuditLogTable({ entries }: { entries: AuditLogEntry[] }) {
         </div>
       </div>
 
-      <div className="overflow-hidden rounded-lg border border-border bg-card">
+      <div className="portal-table">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-border bg-secondary/40 text-left text-xs font-medium tracking-wider text-muted-foreground uppercase">
+              <tr className="portal-table-head">
                 <th className="px-4 py-3">Timestamp</th>
                 <th className="px-4 py-3">Actor</th>
                 <th className="px-4 py-3">Category</th>
@@ -139,7 +140,7 @@ export function AuditLogTable({ entries }: { entries: AuditLogEntry[] }) {
                 const config = severityConfig[entry.severity]
                 const SeverityIcon = config.icon
                 return (
-                  <tr key={entry.id} className="border-b border-border last:border-0 hover:bg-secondary/50">
+                  <tr key={entry.id} className="portal-table-row">
                     <td className="px-4 py-3.5 whitespace-nowrap font-mono text-xs text-muted-foreground">
                       {formatTimestamp(entry.timestamp)}
                     </td>
@@ -154,12 +155,7 @@ export function AuditLogTable({ entries }: { entries: AuditLogEntry[] }) {
                     </td>
                     <td className="px-4 py-3.5 font-mono text-xs text-foreground">{entry.target}</td>
                     <td className="px-4 py-3.5">
-                      <span
-                        className={cn(
-                          "inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium",
-                          config.className,
-                        )}
-                      >
+                      <span className={cn("status-badge gap-1.5", config.className)}>
                         <SeverityIcon className="size-3.5" />
                         {config.label}
                       </span>
@@ -170,8 +166,9 @@ export function AuditLogTable({ entries }: { entries: AuditLogEntry[] }) {
               })}
               {paged.length === 0 && (
                 <tr>
-                  <td colSpan={7} className="px-4 py-10 text-center text-sm text-muted-foreground">
-                    No audit entries match your filters.
+                  <td colSpan={7} className="portal-empty">
+                    <p className="portal-empty-title">No audit entries match</p>
+                    <p className="portal-empty-copy">Try a different search, or clear a filter.</p>
                   </td>
                 </tr>
               )}
@@ -179,26 +176,15 @@ export function AuditLogTable({ entries }: { entries: AuditLogEntry[] }) {
           </table>
         </div>
 
-        <div className="flex flex-col items-center justify-between gap-3 border-t border-border bg-secondary/30 px-4 py-3 sm:flex-row">
-          <p className="text-sm text-muted-foreground">
-            Showing <span className="font-medium text-foreground">{rangeStart}</span> to{" "}
-            <span className="font-medium text-foreground">{rangeEnd}</span> of{" "}
-            <span className="font-medium text-foreground">{filtered.length}</span> results
-          </p>
-          <div className="flex items-center gap-1">
-            <Button variant="outline" size="icon" disabled={page === 1} onClick={() => setPage((p) => p - 1)} aria-label="Previous page">
-              <ChevronLeft />
-            </Button>
-            {Array.from({ length: totalPages }).slice(0, 3).map((_, i) => (
-              <Button key={i} variant={page === i + 1 ? "default" : "outline"} size="icon" onClick={() => setPage(i + 1)}>
-                {i + 1}
-              </Button>
-            ))}
-            <Button variant="outline" size="icon" disabled={page === totalPages} onClick={() => setPage((p) => p + 1)} aria-label="Next page">
-              <ChevronRight />
-            </Button>
-          </div>
-        </div>
+        <TablePagination
+          page={page}
+          totalPages={totalPages}
+          rangeStart={rangeStart}
+          rangeEnd={rangeEnd}
+          total={filtered.length}
+          onPage={setPage}
+          noun="entries"
+        />
       </div>
     </div>
   )

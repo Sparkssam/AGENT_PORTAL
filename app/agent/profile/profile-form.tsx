@@ -50,7 +50,6 @@ export function ProfileForm({ agent, live = false }: { agent: AgentProfile; live
               setForm((prev) => ({ ...prev, fullName: e.target.value }))
               setSaved(false)
             }}
-            className="h-10"
           />
         </div>
         <div className="flex flex-col gap-1.5">
@@ -62,12 +61,11 @@ export function ProfileForm({ agent, live = false }: { agent: AgentProfile; live
               setForm((prev) => ({ ...prev, phone: e.target.value }))
               setSaved(false)
             }}
-            className="h-10"
           />
         </div>
         <div className="flex flex-col gap-1.5 sm:col-span-2">
           <Label htmlFor="profileEmail">Email address</Label>
-          <Input id="profileEmail" type="email" value={form.email} disabled className="h-10" />
+          <Input id="profileEmail" type="email" value={form.email} disabled />
           <p className="text-xs text-muted-foreground">Email is managed through your login account.</p>
         </div>
       </div>

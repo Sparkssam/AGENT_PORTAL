@@ -116,6 +116,7 @@ export type Database = {
           file_size: number | null
           file_extension: string | null
           rejection_reason: string | null
+          admin_uploaded: boolean
           verified_by: string | null
           verified_at: string | null
           uploaded_at: string | null

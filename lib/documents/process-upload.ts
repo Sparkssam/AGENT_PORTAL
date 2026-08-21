@@ -5,9 +5,11 @@ import { canAgentChangeDocument, isClosedStatus } from "@/lib/backend/status"
 import { getAuthContext } from "@/lib/backend/session"
 import { clientIp, extensionFromMime } from "@/lib/backend/request"
 import { ALLOWED_DOCUMENT_MIME, MAX_DOCUMENT_BYTES, documentTypeSchema, uuidSchema } from "@/lib/backend/zod"
+import { storedDocumentFileName } from "@/lib/domain"
 import { DOCUMENTS_BUCKET, storageObjectPath } from "@/lib/storage/paths"
 import { getPrisma } from "@/lib/prisma"
 import { writeAudit } from "@/lib/db/events"
+import { withDbGuards } from "@/lib/db/guards"
 import { assertAgentOwnsApplication, assertAgentWritable, isStaffRole } from "@/lib/db/ownership"
 import { insertDocumentVerification } from "@/lib/db/verification-store"
 import { runDocumentPipeline, type VerifiableDocumentType } from "@/lib/verification"
@@ -45,7 +47,10 @@ export async function processDocumentUpload(formData: FormData) {
   const app = await prisma.application.findFirst({ where: { id: applicationId, deletedAt: null } })
   if (!app) throw new NotFoundError("Application not found")
 
-  const owner = await prisma.agent.findUnique({ where: { id: app.agentId } })
+  const owner = await prisma.agent.findUnique({
+    where: { id: app.agentId },
+    include: { profile: { select: { fullName: true, phone: true, email: true } } },
+  })
   if (!owner) throw new NotFoundError("Agent record not found")
 
   if (!isAdmin) {
@@ -68,9 +73,9 @@ export async function processDocumentUpload(formData: FormData) {
     mimeType: mime,
     documentType: documentType as VerifiableDocumentType,
     identity: {
-      fullName: profile.fullName || app.agentName || "",
-      phone: profile.phone || app.phone || "",
-      email: profile.email || app.email || "",
+      fullName: app.agentName || owner.profile.fullName || "",
+      phone: app.phone || owner.profile.phone || "",
+      email: app.email || owner.profile.email || "",
       idType: app.idType ?? "",
       idNumber: app.idNumber ?? "",
       tinNumber: app.tinNumber ?? "",
@@ -92,17 +97,25 @@ export async function processDocumentUpload(formData: FormData) {
   }
 
   const ext = extensionFromMime(mime, incoming.name.split(".").pop() ?? "bin")
+  const uniqueSuffix = documentType === "other" ? `_${randomUUID().slice(0, 8)}` : ""
+  const fileName = storedDocumentFileName({
+    agentName: app.agentName || owner.profile?.fullName || "agent",
+    agentCode: owner.agentCode,
+    agentId: owner.id,
+    documentType: `${documentType}${uniqueSuffix}`,
+    extension: ext,
+  })
   const path = storageObjectPath({
     userId: owner.userId,
     applicationId: app.id,
     documentType,
-    objectId: randomUUID(),
+    fileName,
     extension: ext,
   })
 
   const { error: storageError } = await supabase.storage.from(DOCUMENTS_BUCKET).upload(path, buffer, {
     contentType: mime,
-    upsert: false,
+    upsert: true,
   })
   if (storageError) throw new BackendError("DOCUMENT", storageError.message)
 
@@ -114,33 +127,41 @@ export async function processDocumentUpload(formData: FormData) {
         })
 
   const replacing = String(formData.get("replace") ?? "") === "true"
-  if (existing?.storageKey && existing.status !== "missing" && existing.status !== "rejected" && !replacing) {
+  const onBehalf = isAdmin && String(formData.get("onBehalf") ?? "") === "true"
+  if (existing?.storageKey && existing.status !== "missing" && existing.status !== "rejected" && !replacing && !onBehalf) {
     throw new BackendError("DOCUMENT", "This document is already uploaded. Choose Replace to send a new file.")
   }
+  if (onBehalf && !isAdmin) throw new BackendError("DOCUMENT", "Only staff can upload on behalf of an agent")
 
+  const autoAccept = Boolean(isAdmin && (onBehalf || (replacing && existing?.adminUploaded)))
   const payload = {
     storageKey: path,
     originalName: incoming.name,
     mimeType: mime,
     fileSize: BigInt(incoming.size),
     fileExtension: ext,
-    status: "unverified" as const,
+    status: autoAccept ? ("verified" as const) : ("unverified" as const),
     rejectionReason: null,
     uploadedAt: new Date(),
-    verifiedById: null,
-    verifiedAt: null,
+    adminUploaded: autoAccept,
+    verifiedById: autoAccept ? profile.id : null,
+    verifiedAt: autoAccept ? new Date() : null,
   }
 
   let documentId = existing?.id
   if (existing) {
-    await prisma.document.update({ where: { id: existing.id }, data: payload })
+    await withDbGuards(async (tx) => {
+      await tx.document.update({ where: { id: existing.id }, data: payload })
+    })
     if (existing.storageKey && existing.storageKey !== path) {
       await supabase.storage.from(DOCUMENTS_BUCKET).remove([existing.storageKey])
     }
   } else {
-    const inserted = await prisma.document.create({
-      data: { applicationId: app.id, documentType, ...payload },
-    })
+    const inserted = await withDbGuards(async (tx) =>
+      tx.document.create({
+        data: { applicationId: app.id, documentType, ...payload },
+      }),
+    )
     documentId = inserted.id
   }
 
@@ -168,12 +189,21 @@ export async function processDocumentUpload(formData: FormData) {
     })
   }
 
+  const agentLabel = app.agentName || owner.profile.fullName || "agent"
   await writeAudit({
     actorId: profile.id,
     actorRole: profile.role,
     category: "Document",
-    action: isAdmin ? "Uploaded document (staff)" : "Uploaded document",
-    detail: documentType,
+    action: onBehalf
+      ? "Uploaded document on behalf of agent"
+      : replacing
+        ? autoAccept
+          ? "Replaced admin-uploaded document"
+          : "Replaced document"
+        : isAdmin
+          ? "Uploaded document (staff)"
+          : "Uploaded document",
+    detail: `${documentType} for ${agentLabel} as ${fileName} (original ${incoming.name})`,
     entityType: "document",
     entityId: documentId,
     target: app.applicationNumber ?? app.id,

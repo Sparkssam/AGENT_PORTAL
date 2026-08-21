@@ -5,9 +5,11 @@ const prisma = new PrismaClient()
 async function main() {
   await prisma.channel.createMany({
     data: [
-      { name: "M-Pesa", code: "mpesa" },
-      { name: "Tigo Pesa", code: "tigo_pesa" },
-      { name: "Airtel Money", code: "airtel_money" },
+      { name: "Mixx by Yas", code: "mixx_by_yas" },
+      { name: "Vodacom", code: "vodacom" },
+      { name: "Airtel", code: "airtel" },
+      { name: "Halotel", code: "halotel" },
+      { name: "TTCL", code: "ttcl" },
     ],
     skipDuplicates: true,
   })

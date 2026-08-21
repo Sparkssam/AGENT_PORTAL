@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useMemo, useState, type ReactNode } from "react"
 import Image from "next/image"
 import Link from "next/link"
 import {
@@ -12,15 +12,23 @@ import {
   FileText,
   FolderOpen,
   ImageOff,
+  MoreHorizontal,
   Search,
   Upload,
   XCircle,
 } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import {
   Sheet,
@@ -32,25 +40,27 @@ import {
   SheetClose,
 } from "@/components/ui/sheet"
 import {
-  buildDocumentFileName,
+  storedDocumentFileName,
   getDocumentFile,
   type Application,
   type Document,
-  type DocumentStatus,
 } from "@/lib/domain"
-import { downloadFile } from "@/lib/download"
+import { downloadBlob, downloadFile } from "@/lib/download"
 import { documentTypeLabel, formatBytes } from "@/lib/documents/catalog"
 import { signedGet, verifyDocument, rejectDocument } from "@/lib/actions/documents"
 import type { ClientVerification } from "@/lib/actions/verifications"
 import { DocumentUploadDialog } from "@/components/documents/document-upload-dialog"
 import { DocumentRejectDialog } from "@/components/documents/document-reject-dialog"
 import { FlaggedVerifications } from "./flagged-verifications"
+import { DocumentStatusLabel } from "@/components/admin/status-badge"
 import { cn } from "@/lib/utils"
 
 interface FlatDocument extends Document {
   appId: string
   appNumber: string
   agentName: string
+  agentCode?: string
+  agentId?: string
   channel: string
 }
 
@@ -61,6 +71,8 @@ function flattenDocuments(applications: Application[]): FlatDocument[] {
       appId: app.id,
       appNumber: app.appNumber,
       agentName: app.agentName,
+      agentCode: app.agentCode,
+      agentId: app.agentId,
       channel: app.channel,
     })),
   )
@@ -70,57 +82,71 @@ function rowKey(doc: FlatDocument) {
   return `${doc.appId}:${doc.id}`
 }
 
-function isDownloadable(doc: FlatDocument, live: boolean) {
+function hasFile(doc: FlatDocument, live: boolean) {
   if (doc.status === "missing") return false
   return live || Boolean(getDocumentFile(doc))
 }
 
+function downloadName(doc: FlatDocument) {
+  return storedDocumentFileName({
+    agentName: doc.agentName,
+    agentCode: doc.agentCode,
+    agentId: doc.agentId,
+    documentType: doc.type,
+    extension: doc.fileExtension ?? getDocumentFile(doc)?.extension ?? "png",
+  })
+}
+
 async function downloadDocument(doc: FlatDocument, live: boolean) {
   if (live) {
-    try {
-      const signed = await signedGet(doc.id, "attachment")
-      await downloadFile(signed.getUrl, signed.filename ?? `${doc.name}.png`)
-      return
-    } catch {
-      // fall through to local file
-    }
+    const signed = await signedGet(doc.id, "attachment")
+    await downloadFile(signed.getUrl, signed.filename ?? downloadName(doc))
+    return
   }
   const file = getDocumentFile(doc)
   if (!file) return
-  const filename = buildDocumentFileName({
-    agentName: doc.agentName,
-    docName: doc.name,
-    network: doc.channel,
-    extension: file.extension,
-  })
-  await downloadFile(file.url, filename)
+  await downloadFile(file.url, downloadName(doc))
 }
 
-async function downloadMany(docs: FlatDocument[], live: boolean) {
-  for (const doc of docs) {
-    await downloadDocument(doc, live)
-    await new Promise((resolve) => setTimeout(resolve, 250))
-  }
+const summaryTone: Record<string, string> = {
+  default: "bg-foreground",
+  success: "bg-success",
+  warning: "bg-warning",
+  destructive: "bg-destructive",
 }
 
-function DocStatusBadge({ status }: { status: DocumentStatus }) {
-  const styles: Record<DocumentStatus, string> = {
-    verified: "bg-[var(--color-success)]/10 text-[var(--color-success)]",
-    unverified: "bg-[var(--color-warning)]/10 text-[var(--color-warning)]",
-    rejected: "bg-destructive/10 text-destructive",
-    missing: "bg-muted text-muted-foreground",
-  }
-  const labels: Record<DocumentStatus, string> = {
-    verified: "Approved",
-    unverified: "Pending",
-    rejected: "Rejected",
-    missing: "Required",
-  }
-  return <Badge className={cn("border-0 font-medium", styles[status])}>{labels[status]}</Badge>
+function BulkDownloadButton({
+  disabled,
+  reason,
+  children,
+  onClick,
+}: {
+  disabled: boolean
+  reason: string
+  children: ReactNode
+  onClick: () => void
+}) {
+  const button = (
+    <Button
+      variant="outline"
+      size="sm"
+      className="rounded-full portal-download-btn disabled:opacity-100"
+      disabled={disabled}
+      onClick={onClick}
+    >
+      {children}
+    </Button>
+  )
+  if (!disabled) return button
+  return (
+    <Tooltip>
+      <TooltipTrigger render={<span className="inline-flex" />}>{button}</TooltipTrigger>
+      <TooltipContent side="bottom">{reason}</TooltipContent>
+    </Tooltip>
+  )
 }
 
 const PAGE_SIZE = 12
-const BULK_DOWNLOAD_LIMIT = 50
 
 const statusFilters: Array<{ value: string; label: string }> = [
   { value: "all", label: "All" },
@@ -152,6 +178,8 @@ export function DocumentsTable({
   const [bulkMessage, setBulkMessage] = useState<string | null>(null)
   const [rejectOpen, setRejectOpen] = useState(false)
   const [uploadOpen, setUploadOpen] = useState(false)
+  const [uploadIntent, setUploadIntent] = useState<"default" | "onBehalf" | "replace">("default")
+  const [skipBanner, setSkipBanner] = useState<{ skipped: number; requested: number } | null>(null)
   const [tab, setTab] = useState("library")
 
   useEffect(() => {
@@ -200,14 +228,18 @@ export function DocumentsTable({
     }
   }, [allDocuments])
 
-  const downloadableFiltered = useMemo(
-    () => filtered.filter((doc) => isDownloadable(doc, live)),
+  const selectableFiltered = useMemo(
+    () => filtered.filter((doc) => hasFile(doc, live)),
     [filtered, live],
   )
-  const pageDownloadable = paged.filter((doc) => isDownloadable(doc, live))
-  const pageKeys = pageDownloadable.map(rowKey)
+  const pageSelectable = paged.filter((doc) => hasFile(doc, live))
+  const pageKeys = pageSelectable.map(rowKey)
   const allPageSelected = pageKeys.length > 0 && pageKeys.every((key) => selectedKeys.includes(key))
-  const selectedDocs = allDocuments.filter((doc) => selectedKeys.includes(rowKey(doc)) && isDownloadable(doc, live))
+  const selectedDocs = allDocuments.filter((doc) => selectedKeys.includes(rowKey(doc)) && hasFile(doc, live))
+  const downloadDisabled = bulkBusy || selectedDocs.length === 0
+  const matchingDisabled = bulkBusy || selectableFiltered.length === 0
+  const downloadReason = "Select documents to download."
+  const matchingReason = "No downloadable files match the current filters."
 
   function setStatusFilter(next: string) {
     setStatus(next)
@@ -226,21 +258,48 @@ export function DocumentsTable({
   }
 
   async function runBulkDownload(docs: FlatDocument[]) {
-    if (docs.length === 0) return
-    const batch = docs.slice(0, BULK_DOWNLOAD_LIMIT)
+    const requested = docs.filter((doc) => hasFile(doc, live))
+    if (requested.length === 0) return
     setBulkBusy(true)
-    setBulkMessage(`Downloading ${batch.length} file${batch.length === 1 ? "" : "s"}…`)
+    setSkipBanner(null)
+    setBulkMessage(
+      `Preparing ${requested.length} file${requested.length === 1 ? "" : "s"}…`,
+    )
     try {
-      await downloadMany(batch, live)
-      setBulkMessage(
-        docs.length > BULK_DOWNLOAD_LIMIT
-          ? `Downloaded first ${BULK_DOWNLOAD_LIMIT} of ${docs.length} matching files.`
-          : `${batch.length} file${batch.length === 1 ? "" : "s"} downloaded.`,
-      )
+      if (live) {
+        const response = await fetch("/api/documents/zip", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ documentIds: requested.map((doc) => doc.id) }),
+        })
+        if (!response.ok) {
+          const payload = (await response.json().catch(() => null)) as { error?: string } | null
+          throw new Error(payload?.error ?? "Could not download documents")
+        }
+        downloadBlob(await response.blob(), "documents.zip")
+        const headerSkipped = Number(response.headers.get("X-Documents-Skipped") ?? 0)
+        if (headerSkipped > 0) {
+          setSkipBanner({ skipped: headerSkipped, requested: requested.length })
+        }
+      } else {
+        for (const doc of requested) {
+          await downloadDocument(doc, false)
+          await new Promise((resolve) => setTimeout(resolve, 200))
+        }
+      }
+      setBulkMessage(`${requested.length} file${requested.length === 1 ? "" : "s"} downloaded.`)
+    } catch (error) {
+      setBulkMessage(error instanceof Error ? error.message : "Download failed")
     } finally {
       setBulkBusy(false)
       window.setTimeout(() => setBulkMessage(null), 2500)
     }
+  }
+
+  function openUpload(doc: FlatDocument, intent: "onBehalf" | "replace") {
+    setSelected(doc)
+    setUploadIntent(intent)
+    setUploadOpen(true)
   }
 
   function openByDocumentId(documentId: string) {
@@ -269,15 +328,18 @@ export function DocumentsTable({
               type="button"
               onClick={() => setStatusFilter(card.value)}
               className={cn(
-                "flex flex-col gap-3 rounded-[1.5rem] border bg-card p-5 text-left transition",
-                active ? "border-foreground/20 ring-2 ring-accent/40" : "border-border hover:bg-muted/30",
+                "portal-stat-card text-left transition",
+                active ? "ring-2 ring-accent/50" : "hover:bg-muted/30",
               )}
             >
               <div className="flex items-center justify-between">
-                <span className="text-sm text-muted-foreground">{card.label}</span>
+                <div className="flex items-center gap-2">
+                  <span className={cn("size-1.5 rounded-full", summaryTone[card.tone])} />
+                  <span className="text-sm text-muted-foreground">{card.label}</span>
+                </div>
                 <Icon className="size-4 text-muted-foreground/60" />
               </div>
-              <p className="font-mono text-3xl font-semibold tracking-tight text-foreground">
+              <p className="font-mono text-2xl font-medium tabular-nums tracking-tight text-foreground">
                 {card.count.toLocaleString("en-US")}
               </p>
             </button>
@@ -298,10 +360,10 @@ export function DocumentsTable({
           {bulkMessage ? <p className="text-xs text-muted-foreground">{bulkMessage}</p> : null}
         </div>
 
-        <TabsContent value="library" className="mt-4 flex flex-col gap-4">
-          <div className="flex flex-col gap-3 rounded-2xl border border-border bg-card p-4">
-            <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
-              <div className="relative flex-1">
+        <TabsContent value="library" className="flex flex-col gap-4">
+          <div className="portal-card flex flex-col gap-4">
+            <div className="portal-toolbar">
+              <div className="relative min-w-0 flex-1">
                 <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
                 <Input
                   value={search}
@@ -310,9 +372,11 @@ export function DocumentsTable({
                     setPage(1)
                   }}
                   placeholder="Search documents, agents, or application numbers…"
+                  aria-label="Search documents"
                   className="pl-9"
                 />
               </div>
+              <div className="flex w-full flex-wrap gap-2 lg:w-auto">
               <Select
                 value={agent}
                 onValueChange={(v) => {
@@ -320,7 +384,7 @@ export function DocumentsTable({
                   setPage(1)
                 }}
               >
-                <SelectTrigger className="w-full lg:w-52">
+                <SelectTrigger className="w-full sm:w-52">
                   <SelectValue placeholder="Agent" />
                 </SelectTrigger>
                 <SelectContent>
@@ -341,7 +405,7 @@ export function DocumentsTable({
                   setPage(1)
                 }}
               >
-                <SelectTrigger className="w-full lg:w-56">
+                <SelectTrigger className="w-full sm:w-56">
                   <SelectValue placeholder="Document type" />
                 </SelectTrigger>
                 <SelectContent>
@@ -355,6 +419,7 @@ export function DocumentsTable({
                   </SelectGroup>
                 </SelectContent>
               </Select>
+              </div>
             </div>
 
             <div className="flex flex-wrap items-center justify-between gap-3">
@@ -365,39 +430,45 @@ export function DocumentsTable({
                     type="button"
                     size="sm"
                     variant={status === item.value ? "default" : "outline"}
+                    className="rounded-full"
                     onClick={() => setStatusFilter(item.value)}
                   >
                     {item.label}
                   </Button>
                 ))}
               </div>
-              <div className="flex flex-wrap items-center gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  disabled={bulkBusy || selectedDocs.length === 0}
-                  onClick={() => void runBulkDownload(selectedDocs)}
-                >
-                  <Download data-icon="inline-start" />
-                  Download selected{selectedDocs.length ? ` (${selectedDocs.length})` : ""}
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  disabled={bulkBusy || downloadableFiltered.length === 0}
-                  onClick={() => void runBulkDownload(downloadableFiltered)}
-                >
-                  <Download data-icon="inline-start" />
-                  Download matching ({downloadableFiltered.length})
-                </Button>
+              <div className="flex flex-col items-end gap-1">
+                <div className="flex flex-wrap items-center gap-2">
+                  <BulkDownloadButton
+                    disabled={downloadDisabled}
+                    reason={downloadReason}
+                    onClick={() => void runBulkDownload(selectedDocs)}
+                  >
+                    <Download data-icon="inline-start" />
+                    Download{selectedDocs.length ? ` (${selectedDocs.length})` : ""}
+                  </BulkDownloadButton>
+                  <BulkDownloadButton
+                    disabled={matchingDisabled}
+                    reason={matchingReason}
+                    onClick={() => void runBulkDownload(selectableFiltered)}
+                  >
+                    <Download data-icon="inline-start" />
+                    Download matching
+                  </BulkDownloadButton>
+                </div>
               </div>
             </div>
+            {skipBanner ? (
+              <div className="rounded-xl border border-warning/30 bg-warning-muted px-3 py-2 text-sm text-warning-foreground">
+                {skipBanner.skipped} of {skipBanner.requested} not included — no file stored
+              </div>
+            ) : null}
           </div>
 
-          <div className="overflow-hidden rounded-2xl border border-border bg-card">
+          <div className="portal-table">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-border bg-secondary/50 text-left text-xs uppercase tracking-wide text-muted-foreground">
+                <tr className="portal-table-head">
                   <th className="w-10 px-3 py-2">
                     <Checkbox
                       checked={allPageSelected}
@@ -417,17 +488,17 @@ export function DocumentsTable({
               <tbody>
                 {paged.map((doc) => {
                   const key = rowKey(doc)
-                  const canGet = isDownloadable(doc, live)
+                  const canSelect = hasFile(doc, live)
                   return (
                     <tr
                       key={key}
                       onClick={() => setSelected(doc)}
-                      className="cursor-pointer border-b border-border last:border-0 hover:bg-secondary/40"
+                      className="portal-table-row cursor-pointer"
                     >
                       <td className="px-3 py-2" onClick={(event) => event.stopPropagation()}>
                         <Checkbox
                           checked={selectedKeys.includes(key)}
-                          disabled={!canGet}
+                          disabled={!canSelect}
                           onCheckedChange={(value) => toggleKey(key, value === true)}
                           aria-label={`Select ${doc.name}`}
                         />
@@ -451,9 +522,8 @@ export function DocumentsTable({
                           <div className="min-w-0">
                             <p className="truncate font-medium text-foreground">{doc.name}</p>
                             <p className="truncate text-xs text-muted-foreground">
-                              {doc.fileType.toUpperCase()}
+                              {doc.originalName ?? doc.storedFileName ?? doc.fileType.toUpperCase()}
                               {doc.fileSize ? ` · ${formatBytes(doc.fileSize)}` : ""}
-                              {doc.verifiedBy ? ` · ${doc.verifiedBy}` : ""}
                             </p>
                           </div>
                         </div>
@@ -470,22 +540,57 @@ export function DocumentsTable({
                         </Link>
                       </td>
                       <td className="px-3 py-2">
-                        <DocStatusBadge status={doc.status} />
+                        <DocumentStatusLabel status={doc.status} adminUploaded={doc.adminUploaded} />
                       </td>
                       <td className="px-3 py-2">
                         <div className="flex justify-end gap-1" onClick={(event) => event.stopPropagation()}>
-                          <Button variant="ghost" size="icon-sm" onClick={() => setSelected(doc)} aria-label="Preview">
-                            <Eye />
-                          </Button>
                           <Button
                             variant="ghost"
                             size="icon-sm"
-                            disabled={!canGet || bulkBusy}
-                            onClick={() => void downloadDocument(doc, live)}
-                            aria-label="Download"
+                            className="rounded-full"
+                            onClick={() => setSelected(doc)}
+                            aria-label="Preview"
                           >
-                            <Download />
+                            <Eye />
                           </Button>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger
+                              render={
+                                <Button
+                                  variant="ghost"
+                                  size="icon-sm"
+                                  className="rounded-full"
+                                  aria-label="Document actions"
+                                />
+                              }
+                            >
+                              <MoreHorizontal />
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end" className="min-w-56">
+                              <DropdownMenuItem
+                                disabled={!canSelect || bulkBusy}
+                                onClick={() => {
+                                  void downloadDocument(doc, live).catch((error) => {
+                                    setBulkMessage(error instanceof Error ? error.message : "Download failed")
+                                  })
+                                }}
+                              >
+                                <Download />
+                                Download
+                              </DropdownMenuItem>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem onClick={() => openUpload(doc, "onBehalf")}>
+                                <Upload />
+                                Upload on behalf of agent
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                disabled={doc.status === "missing"}
+                                onClick={() => openUpload(doc, "replace")}
+                              >
+                                Replace document
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
                         </div>
                       </td>
                     </tr>
@@ -493,8 +598,9 @@ export function DocumentsTable({
                 })}
                 {paged.length === 0 && (
                   <tr>
-                    <td colSpan={7} className="px-4 py-10 text-center text-sm text-muted-foreground">
-                      No documents match your filters.
+                    <td colSpan={7} className="portal-empty">
+                      <p className="portal-empty-title">No documents match</p>
+                      <p className="portal-empty-copy">Try a different search, or clear a filter.</p>
                     </td>
                   </tr>
                 )}
@@ -502,7 +608,7 @@ export function DocumentsTable({
             </table>
           </div>
 
-          <div className="flex items-center justify-between text-sm text-muted-foreground">
+          <div className="flex flex-col items-center justify-between gap-3 text-sm text-muted-foreground sm:flex-row">
             <p>
               Showing {paged.length === 0 ? 0 : (page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, filtered.length)}{" "}
               of {filtered.length}
@@ -520,7 +626,7 @@ export function DocumentsTable({
         </TabsContent>
 
         {live ? (
-          <TabsContent value="flagged" className="mt-4">
+          <TabsContent value="flagged">
             <FlaggedVerifications items={flagged} onPreview={openByDocumentId} />
           </TabsContent>
         ) : null}
@@ -563,7 +669,7 @@ export function DocumentsTable({
                   <div>
                     <p className="text-xs text-muted-foreground">Status</p>
                     <div className="mt-1">
-                      <DocStatusBadge status={selected.status} />
+                      <DocumentStatusLabel status={selected.status} adminUploaded={selected.adminUploaded} />
                     </div>
                   </div>
                   <div>
@@ -571,8 +677,12 @@ export function DocumentsTable({
                     <p className="mt-1 text-foreground">{selected.verifiedBy ?? "Not yet verified"}</p>
                   </div>
                   <div>
-                    <p className="text-xs text-muted-foreground">File type</p>
-                    <p className="mt-1 uppercase text-foreground">{selected.fileType}</p>
+                    <p className="text-xs text-muted-foreground">Original file</p>
+                    <p className="mt-1 truncate text-foreground">{selected.originalName ?? selected.storedFileName ?? "—"}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground">Stored as</p>
+                    <p className="mt-1 truncate font-mono text-xs text-foreground">{selected.storedFileName ?? "—"}</p>
                   </div>
                   <div>
                     <p className="text-xs text-muted-foreground">Document type</p>
@@ -580,7 +690,7 @@ export function DocumentsTable({
                   </div>
                 </div>
                 {selected.status === "rejected" && selected.reason && (
-                  <div className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2">
+                  <div className="rounded-xl border border-destructive/30 bg-destructive-muted px-3 py-2">
                     <p className="text-xs font-medium text-destructive">Rejection reason</p>
                     <p className="mt-0.5 text-sm text-destructive/90">{selected.reason}</p>
                   </div>
@@ -605,7 +715,7 @@ export function DocumentsTable({
                 ) : null}
               </div>
               <SheetFooter className="gap-2">
-                {(live || getDocumentFile(selected)) && selected.status !== "missing" && (
+                {hasFile(selected, live) && (
                   <Button
                     className="w-full justify-center"
                     onClick={() => void downloadDocument(selected, live)}
@@ -614,10 +724,29 @@ export function DocumentsTable({
                     Download file
                   </Button>
                 )}
-                <Button variant="outline" className="w-full justify-center" onClick={() => setUploadOpen(true)}>
+                <Button
+                  variant="outline"
+                  className="w-full justify-center"
+                  onClick={() => {
+                    setUploadIntent("onBehalf")
+                    setUploadOpen(true)
+                  }}
+                >
                   <Upload data-icon="inline-start" />
-                  Upload / replace
+                  Upload on behalf of agent
                 </Button>
+                {selected.status !== "missing" ? (
+                  <Button
+                    variant="outline"
+                    className="w-full justify-center"
+                    onClick={() => {
+                      setUploadIntent("replace")
+                      setUploadOpen(true)
+                    }}
+                  >
+                    Replace document
+                  </Button>
+                ) : null}
                 {selected.status !== "missing" && (
                   <div className="grid w-full grid-cols-2 gap-2">
                     <Button
@@ -635,7 +764,12 @@ export function DocumentsTable({
                         setBusy(true)
                         try {
                           if (live) await verifyDocument(selected.id)
-                          const next = { ...selected, status: "verified" as const, verifiedBy: "Registry" }
+                          const next = {
+                            ...selected,
+                            status: "verified" as const,
+                            verifiedBy: "Registry",
+                            adminUploaded: false,
+                          }
                           setSelected(next)
                           setApps((current) =>
                             current.map((app) =>
@@ -701,11 +835,15 @@ export function DocumentsTable({
       {selected ? (
         <DocumentUploadDialog
           open={uploadOpen}
-          onOpenChange={setUploadOpen}
+          onOpenChange={(open) => {
+            setUploadOpen(open)
+            if (!open) setUploadIntent("default")
+          }}
           applicationId={selected.appId}
           documents={apps.find((app) => app.id === selected.appId)?.documents ?? [selected]}
           initialType={selected.type}
           live={live}
+          intent={uploadIntent}
           onComplete={(nextDocs) => {
             setApps((current) => current.map((app) => (app.id === selected.appId ? { ...app, documents: nextDocs } : app)))
             const updated = nextDocs.find((doc) => doc.type === selected.type)

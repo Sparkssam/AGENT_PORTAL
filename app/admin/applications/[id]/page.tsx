@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation"
 import { findDuplicates, getApplication } from "@/lib/actions/applications"
+import { getSession } from "@/lib/actions/auth"
 import { ApplicationReview } from "./application-review"
 
 export default async function ApplicationDetailPage({ params }: { params: Promise<{ id: string }> }) {
@@ -8,12 +9,22 @@ export default async function ApplicationDetailPage({ params }: { params: Promis
 
   if (!application) notFound()
 
-  const duplicates = await findDuplicates({
-    phone: application.phone,
-    idNumber: application.idNumber,
-    tinNumber: application.tinNumber,
-    excludeId: application.id,
-  }).catch(() => [])
+  const [duplicates, session] = await Promise.all([
+    findDuplicates({
+      phone: application.phone,
+      idNumber: application.idNumber,
+      tinNumber: application.tinNumber,
+      excludeId: application.id,
+    }).catch(() => []),
+    getSession(),
+  ])
 
-  return <ApplicationReview application={application} duplicates={duplicates} live />
+  return (
+    <ApplicationReview
+      application={application}
+      duplicates={duplicates}
+      live
+      canFinalize={Boolean(session?.canFinalize)}
+    />
+  )
 }

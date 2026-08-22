@@ -2,13 +2,18 @@ import { PageBackLink } from "@/components/page-back-link"
 import { PageHeader } from "@/components/page-header"
 import { HelpFaqList } from "@/components/help/help-faq-list"
 import { WhatsAppSupportButton } from "@/components/help/whatsapp-support-button"
+import { ApplicationThread } from "@/components/applications/application-thread"
 import { DocumentExampleArt } from "@/components/help/document-example-art"
 import { DOCUMENT_TYPE_OPTIONS } from "@/lib/documents/catalog"
 import { DOCUMENT_EXAMPLES } from "@/lib/help/document-examples"
-import { loadAgentWorkspace } from "@/lib/data/workspace"
+import { listApplicationSummaries } from "@/lib/actions/applications"
+import { loadAgentShell } from "@/lib/data/workspace"
 
 export default async function HelpCenterPage() {
-  const { agent, application } = await loadAgentWorkspace()
+  const { agent } = await loadAgentShell()
+  const summaries = await listApplicationSummaries().catch(() => [])
+  const applicationNumber = summaries[0]?.appNumber
+  const applicationId = summaries[0]?.id
 
   return (
     <div className="portal-page-narrow">
@@ -19,7 +24,7 @@ export default async function HelpCenterPage() {
         action={
           <WhatsAppSupportButton
             agentName={agent.fullName}
-            applicationNumber={application.appNumber}
+            applicationNumber={applicationNumber}
           />
         }
       />
@@ -42,14 +47,15 @@ export default async function HelpCenterPage() {
 
       <HelpFaqList />
 
+      {applicationId ? <ApplicationThread applicationId={applicationId} live audience="agent" /> : null}
+
       <div className="portal-card-muted">
         <p className="portal-card-title">Still stuck?</p>
         <p className="mt-2 text-sm text-muted-foreground">
-          If the FAQ does not cover it, chat with support on WhatsApp. Your name and application number are included
-          in the message.
+          If the FAQ does not cover it, message the review team on this application, or chat on WhatsApp.
         </p>
         <div className="mt-5">
-          <WhatsAppSupportButton agentName={agent.fullName} applicationNumber={application.appNumber} />
+          <WhatsAppSupportButton agentName={agent.fullName} applicationNumber={applicationNumber} />
         </div>
       </div>
     </div>

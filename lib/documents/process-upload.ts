@@ -14,6 +14,7 @@ import { assertAgentOwnsApplication, assertAgentWritable, isStaffRole } from "@/
 import { insertDocumentVerification } from "@/lib/db/verification-store"
 import { runDocumentPipeline, type VerifiableDocumentType } from "@/lib/verification"
 import { mimeFromFile } from "@/lib/documents/catalog"
+import { assertUploadRateLimit } from "@/lib/rate-limit"
 
 function isoDate(value?: Date | string | null) {
   if (!value) return ""
@@ -24,6 +25,7 @@ function isoDate(value?: Date | string | null) {
 
 export async function processDocumentUpload(formData: FormData) {
   const { supabase, profile } = await getAuthContext()
+  await assertUploadRateLimit(profile.id)
   const prisma = getPrisma()
   const isAdmin = isStaffRole(profile.role)
   const applicationId = uuidSchema.parse(String(formData.get("applicationId") ?? ""))

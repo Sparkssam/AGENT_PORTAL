@@ -20,25 +20,39 @@ export async function listAgents(filters?: {
 }) {
   await requireAdmin()
   const prisma = getPrisma()
+  const needle = filters?.query?.trim()
   const rows = await prisma.agent.findMany({
     where: {
       status: filters?.status,
       commercialChannel: filters?.commercialChannel,
       profile: { role: "agent" },
+      ...(needle
+        ? {
+            OR: [
+              { agentCode: { contains: needle, mode: "insensitive" } },
+              { profile: { fullName: { contains: needle, mode: "insensitive" } } },
+              { profile: { email: { contains: needle, mode: "insensitive" } } },
+              { profile: { phone: { contains: needle, mode: "insensitive" } } },
+            ],
+          }
+        : {}),
     },
-    include: { profile: true },
+    select: {
+      id: true,
+      userId: true,
+      agentCode: true,
+      status: true,
+      commercialChannel: true,
+      verified: true,
+      memberSince: true,
+      createdAt: true,
+      profile: {
+        select: { fullName: true, email: true, phone: true, role: true, title: true, initials: true },
+      },
+    },
     orderBy: { createdAt: "desc" },
   })
-  const needle = filters?.query?.trim().toLowerCase()
-  if (!needle) return rows
-  return rows.filter((row) => {
-    return (
-      row.profile.fullName.toLowerCase().includes(needle) ||
-      row.profile.email.toLowerCase().includes(needle) ||
-      row.profile.phone?.toLowerCase().includes(needle) ||
-      row.agentCode?.toLowerCase().includes(needle)
-    )
-  })
+  return rows
 }
 
 export async function getAgent(agentId: string) {

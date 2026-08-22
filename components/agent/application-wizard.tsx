@@ -31,7 +31,7 @@ import type { Application, Document } from "@/lib/domain"
 import { formatDateLong, formatDateTime, formatGps, formatPhoneTZ } from "@/lib/format"
 import { type AgentProfile } from "@/lib/agent-data"
 import { cn } from "@/lib/utils"
-import { saveDraft, submitApplication } from "@/lib/actions/applications"
+import { saveDraft, submitApplication, checkIdentityDuplicates } from "@/lib/actions/applications"
 import { upsertDeposit } from "@/lib/actions/deposits"
 import { DocumentUploadDialog } from "@/components/documents/document-upload-dialog"
 import { SupportingDocumentsList } from "@/components/documents/supporting-documents-list"
@@ -230,6 +230,9 @@ export function ApplicationWizard({
   const savingRef = useRef(false)
   const skipAutosaveRef = useRef(true)
   const lastSavedRef = useRef("")
+  const [savedAt, setSavedAt] = useState<Date | null>(null)
+  const [dupNote, setDupNote] = useState<string | null>(null)
+  const draftKey = `kinetic.draft.${agent.id}`
 
   const docsProgress = documentSlotProgress(docs)
   const depositProof = docs.some((doc) => doc.type === "deposit_proof" && isFilledDocumentStatus(doc.status))
@@ -326,6 +329,7 @@ export function ApplicationWizard({
       void persistDraft()
         .then(() => {
           lastSavedRef.current = payload
+          setSavedAt(new Date())
         })
         .catch((err) => setError(err instanceof Error ? err.message : "Could not save draft"))
         .finally(() => {
@@ -336,6 +340,70 @@ export function ApplicationWizard({
     return () => window.clearTimeout(timer)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [form, live])
+
+  useEffect(() => {
+    try {
+      const raw = window.localStorage.getItem(draftKey)
+      if (!raw) return
+      const parsed = JSON.parse(raw) as { form?: FormState }
+      if (!parsed.form) return
+      if (application?.status && application.status !== "DRAFT" && application.status !== "NEEDS_CORRECTION") return
+      setForm((prev) => ({ ...prev, ...parsed.form }))
+      skipAutosaveRef.current = true
+    } catch {
+      // ignore
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [draftKey])
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(draftKey, JSON.stringify({ form, applicationId, savedAt: Date.now() }))
+    } catch {
+      // ignore
+    }
+  }, [form, applicationId, draftKey])
+
+  useEffect(() => {
+    if (!live) return
+    const flush = () => {
+      if (document.visibilityState === "hidden") void persistDraft().catch(() => undefined)
+    }
+    const onHide = () => void persistDraft().catch(() => undefined)
+    document.addEventListener("visibilitychange", flush)
+    window.addEventListener("pagehide", onHide)
+    return () => {
+      document.removeEventListener("visibilitychange", flush)
+      window.removeEventListener("pagehide", onHide)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [live, form])
+
+  useEffect(() => {
+    if (!live) return
+    const idNumber = form.idNumber.trim()
+    const tinNumber = form.tinNumber.trim()
+    if (!idNumber && !tinNumber) {
+      setDupNote(null)
+      return
+    }
+    const timer = window.setTimeout(() => {
+      void checkIdentityDuplicates({
+        idNumber,
+        tinNumber,
+        excludeId: applicationId && applicationId !== "draft" ? applicationId : undefined,
+      })
+        .then((result) => {
+          const parts = [
+            result.id ? "ID number" : null,
+            result.tin ? "TIN" : null,
+          ].filter(Boolean)
+          setDupNote(parts.length ? `Another application already uses this ${parts.join(" and ")}.` : null)
+        })
+        .catch(() => setDupNote(null))
+    }, 800)
+    return () => window.clearTimeout(timer)
+  }, [form.idNumber, form.tinNumber, applicationId, live])
 
   async function openUpload(documentType?: string) {
     setError(null)
@@ -1032,8 +1100,8 @@ export function ApplicationWizard({
         )}
       </div>
 
-      <div className="flex flex-col gap-3">
-        <div className="flex items-center justify-between gap-3">
+      <div className="sticky bottom-0 z-10 -mx-4 mt-2 flex flex-col gap-3 border-t border-border bg-background/95 px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur sm:static sm:mx-0 sm:border-0 sm:bg-transparent sm:px-0 sm:py-0 sm:backdrop-blur-none">
+        <div className="flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-2">
             <Button variant="ghost" size="lg" onClick={goBack} disabled={step === 1}>
               <ArrowLeft data-icon="inline-start" />
@@ -1114,6 +1182,12 @@ export function ApplicationWizard({
           {!saving && !skipWizardGates && step === 4 && canSubmit && "Ready to submit"}
         </p>
         {error && <p className="text-sm text-destructive">{error}</p>}
+        {dupNote && <p className="text-sm text-warning-foreground">{dupNote}</p>}
+        {live ? (
+          <p className="text-xs text-muted-foreground" aria-live="polite">
+            {saving ? "Saving draft…" : savedAt ? `Draft saved at ${savedAt.toLocaleTimeString()}` : "Draft saves automatically"}
+          </p>
+        ) : null}
       </div>
       <DocumentUploadDialog
         open={uploadOpen}

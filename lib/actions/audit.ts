@@ -18,6 +18,21 @@ export async function listAudit(filters?: {
     },
     orderBy: { createdAt: "desc" },
     take: filters?.take ?? 200,
+    select: {
+      id: true,
+      actorId: true,
+      actorRole: true,
+      category: true,
+      severity: true,
+      action: true,
+      detail: true,
+      target: true,
+      ipAddress: true,
+      createdAt: true,
+      actor: { select: { fullName: true, email: true } },
+    },
   })
-  return data.map(mapPrismaAudit)
+  return data.map((row) =>
+    mapPrismaAudit(row, row.actor?.fullName || row.actor?.email || undefined),
+  )
 }

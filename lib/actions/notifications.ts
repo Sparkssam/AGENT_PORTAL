@@ -11,6 +11,16 @@ export const listNotifications = cache(async function listNotifications(limit = 
     where: { userId: profile.id },
     orderBy: { createdAt: "desc" },
     take: limit,
+    select: {
+      id: true,
+      category: true,
+      title: true,
+      message: true,
+      createdAt: true,
+      readAt: true,
+      entityType: true,
+      entityId: true,
+    },
   })
   return data.map(mapPrismaNotification)
 })

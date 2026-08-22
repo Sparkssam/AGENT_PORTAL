@@ -15,7 +15,7 @@ export default async function ActivityPage() {
       <SetupBanner mode={mode} message={message} />
       <PageHeader
         title="Activity / Audit"
-        description="A tamper-evident trail of every action taken across applications, documents, agents, and system jobs."
+        description="Who changed what, in plain language — applications, documents, agents, and sign-in events."
       />
       <AuditLogTable entries={auditLog} />
     </div>

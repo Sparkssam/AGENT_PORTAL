@@ -2,7 +2,7 @@
 
 import type React from "react"
 import { createContext, useCallback, useContext, useEffect, useState } from "react"
-import { clearSession, type SessionUser, type UserRole } from "@/lib/auth"
+import { clearSession, type SessionUser, type StaffDuty, type UserRole } from "@/lib/auth"
 import { getSession, signIn as supabaseSignIn, signOut as supabaseSignOut, signUp as supabaseSignUp } from "@/lib/actions/auth"
 import { createClient } from "@/lib/supabase/client"
 
@@ -32,6 +32,8 @@ function sessionFromJwt(user: {
 }): SessionUser {
   const rawRole = user.app_metadata?.role
   const role: UserRole = rawRole === "admin" || rawRole === "super_admin" ? "admin" : "agent"
+  const staffDuty: StaffDuty | undefined =
+    rawRole === "super_admin" ? "approver" : rawRole === "admin" ? "reviewer" : undefined
   const name =
     (typeof user.user_metadata?.full_name === "string" && user.user_metadata.full_name) || user.email || "User"
   return {
@@ -39,8 +41,10 @@ function sessionFromJwt(user: {
     role,
     name,
     email: user.email ?? "",
-    title: role === "admin" ? "Administrator" : "Registered Agent",
+    title: staffDuty === "approver" ? "Final approver" : staffDuty === "reviewer" ? "Reviewer" : "Registered Agent",
     initials: initialsFrom(name, user.email ?? ""),
+    staffDuty,
+    canFinalize: rawRole === "super_admin",
   }
 }
 
@@ -59,6 +63,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (!cancelled && current) {
           setUser(sessionFromJwt(current))
           setLoading(false)
+          const session = await getSession()
+          if (!cancelled && session) setUser(session)
           return
         }
       } catch {

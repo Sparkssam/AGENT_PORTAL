@@ -18,6 +18,7 @@ import { AgentMobileNav } from "@/components/agent/agent-mobile-nav"
 import { NotificationBell } from "@/components/agent/notification-bell"
 import { WorkspaceSearch } from "@/components/workspace-search"
 import { WorkspaceIdentity } from "@/components/workspace-identity"
+import { ThemeToggle } from "@/components/theme-toggle"
 import { type AgentNotification, type AgentProfile } from "@/lib/agent-data"
 import { useAuth } from "@/lib/auth-context"
 
@@ -84,6 +85,7 @@ export function AgentTopbar({
       />
 
       <div className="ml-auto flex items-center gap-2 md:gap-3">
+        <ThemeToggle />
         <NotificationBell notifications={notifications} persist={live} />
 
         <DropdownMenu>

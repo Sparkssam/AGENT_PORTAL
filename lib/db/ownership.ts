@@ -4,6 +4,23 @@ export function isStaffRole(role: string) {
   return role === "admin" || role === "super_admin"
 }
 
+/** Super administrators are the only staff who may verify or reject a whole application. */
+export function isFinalApprover(role: string) {
+  return role === "super_admin"
+}
+
+export function staffDutyFor(role: string): "reviewer" | "approver" | undefined {
+  if (role === "super_admin") return "approver"
+  if (role === "admin") return "reviewer"
+  return undefined
+}
+
+export function staffTitleFor(role: string) {
+  if (role === "super_admin") return "Final approver"
+  if (role === "admin") return "Reviewer"
+  return "Registered Agent"
+}
+
 export function assertAgentWritable(status: string | null | undefined) {
   if (status === "suspended") {
     throw new ForbiddenError(

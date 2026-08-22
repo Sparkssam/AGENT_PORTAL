@@ -23,6 +23,15 @@ export interface AgentNotification {
   detail: string
   timestamp: string
   read: boolean
+  entityType?: string | null
+  entityId?: string | null
+}
+
+export function notificationHref(item: AgentNotification, portal: "agent" | "admin") {
+  if (item.entityType === "application" && item.entityId) {
+    return portal === "admin" ? `/admin/applications/${item.entityId}` : `/agent/applications/${item.entityId}`
+  }
+  return portal === "admin" ? "/admin/applications" : "/agent/applications"
 }
 
 export function documentChecklistProgress(documents: Document[]) {

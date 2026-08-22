@@ -512,6 +512,7 @@ export function DocumentsTable({
                                 alt=""
                                 width={32}
                                 height={32}
+                                unoptimized
                                 className="size-8 object-cover"
                                 crossOrigin="anonymous"
                               />
@@ -650,6 +651,7 @@ export function DocumentsTable({
                       alt={selected.name}
                       width={400}
                       height={300}
+                      unoptimized={Boolean(selected.previewUrl)}
                       className="h-full w-full object-cover"
                       crossOrigin="anonymous"
                     />

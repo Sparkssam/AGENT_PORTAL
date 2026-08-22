@@ -4,7 +4,7 @@ import { createClient } from "@/lib/supabase/server"
 import { BackendNotConfiguredError, ForbiddenError } from "@/lib/backend/errors"
 import { isPrismaConfigured, isSupabaseConfigured } from "@/lib/backend/env"
 import { ensureUserRecords, removeUnusedStaffAgent, roleFromAppMetadata } from "@/lib/db/users"
-import { isStaffRole } from "@/lib/db/ownership"
+import { isStaffRole, staffDutyFor, staffTitleFor } from "@/lib/db/ownership"
 import { getPrisma } from "@/lib/prisma"
 import type { SessionUser, UserRole } from "@/lib/auth"
 
@@ -22,13 +22,16 @@ export async function requireConfiguredClient() {
 }
 
 function toSession(profile: Profile): SessionUser {
+  const duty = staffDutyFor(profile.role)
   return {
     id: profile.id,
     role: toSessionRole(profile.role),
     name: profile.fullName,
     email: profile.email,
-    title: profile.title,
+    title: duty ? staffTitleFor(profile.role) : profile.title,
     initials: profile.initials,
+    staffDuty: duty,
+    canFinalize: profile.role === "super_admin",
   }
 }
 
@@ -92,6 +95,14 @@ export const getAuthContext = cache(async function getAuthContext() {
 export async function requireAdmin() {
   const ctx = await getAuthContext()
   if (ctx.session.role !== "admin") throw new ForbiddenError("Admin only")
+  return ctx
+}
+
+export async function requireSuperAdmin() {
+  const ctx = await requireAdmin()
+  if (ctx.profile.role !== "super_admin") {
+    throw new ForbiddenError("Only a final approver can run this action")
+  }
   return ctx
 }
 

@@ -1,9 +1,9 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { Bell, LogOut, Menu, X } from "lucide-react"
+import { LogOut, Menu, X } from "lucide-react"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -15,19 +15,38 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { Button } from "@/components/ui/button"
 import { AdminMobileNav } from "@/components/admin/admin-mobile-nav"
+import { NotificationBell } from "@/components/agent/notification-bell"
 import { WorkspaceSearch } from "@/components/workspace-search"
 import { WorkspaceIdentity } from "@/components/workspace-identity"
+import { ThemeToggle } from "@/components/theme-toggle"
 import { useAuth } from "@/lib/auth-context"
+import { listNotifications } from "@/lib/actions/notifications"
+import type { AgentNotification } from "@/lib/agent-data"
 
 export function AdminTopbar() {
   const [mobileNavOpen, setMobileNavOpen] = useState(false)
   const [query, setQuery] = useState("")
+  const [notifications, setNotifications] = useState<AgentNotification[]>([])
   const { user, logout } = useAuth()
   const router = useRouter()
 
   const name = user?.name ?? "Admin User"
   const email = user?.email ?? "admin@kinetic.co.tz"
   const initials = user?.initials ?? "AU"
+
+  useEffect(() => {
+    let cancelled = false
+    void listNotifications(20)
+      .then((rows) => {
+        if (!cancelled) setNotifications(rows)
+      })
+      .catch(() => {
+        if (!cancelled) setNotifications([])
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   function handleLogout() {
     void logout().then(() => router.push("/login"))
@@ -54,10 +73,8 @@ export function AdminTopbar() {
       />
 
       <div className="ml-auto flex items-center gap-2 md:gap-3">
-        <Button variant="ghost" size="icon" className="relative rounded-full" aria-label="Notifications">
-          <Bell />
-          <span className="absolute right-2 top-2 size-2 rounded-full bg-destructive" />
-        </Button>
+        <ThemeToggle />
+        <NotificationBell notifications={notifications} persist portal="admin" />
 
         <DropdownMenu>
           <DropdownMenuTrigger render={<button type="button" className="rounded-2xl outline-none" />}>

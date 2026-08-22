@@ -9,15 +9,17 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { formatDateTime } from "@/lib/format"
-import type { AgentNotification } from "@/lib/agent-data"
+import { notificationHref, type AgentNotification } from "@/lib/agent-data"
 import { cn } from "@/lib/utils"
 
 export function NotificationBell({
   notifications,
   persist = false,
+  portal = "agent",
 }: {
   notifications: AgentNotification[]
   persist?: boolean
+  portal?: "agent" | "admin"
 }) {
   const [items, setItems] = useState(notifications)
 
@@ -79,7 +81,7 @@ export function NotificationBell({
             {items.map((item) => (
               <li key={item.id}>
                 <Link
-                  href="/agent/applications"
+                  href={notificationHref(item, portal)}
                   onClick={() => void markRead(item.id)}
                   className={cn(
                     "block px-3 py-2.5 transition hover:bg-muted/60",

@@ -46,6 +46,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { Field, FieldLabel } from "@/components/ui/field"
 import { AppStatusBadge, DepositStatusBadge } from "@/components/admin/status-badge"
 import { CaseHealthCard } from "@/components/case-health-card"
+import { ApplicationThread } from "@/components/applications/application-thread"
 import { DetailField } from "@/components/admin/detail-field"
 import {
   buildDocumentFileName,
@@ -88,7 +89,8 @@ function buildCopyAllDetails(app: Application) {
   ].join("\n")
 }
 
-const reviewStatuses: AppStatus[] = ["PENDING_REVIEW", "IN_PROGRESS", "NEEDS_CORRECTION", "COMPLETED", "REJECTED"]
+const reviewerStatuses: AppStatus[] = ["PENDING_REVIEW", "IN_PROGRESS", "NEEDS_CORRECTION"]
+const approverStatuses: AppStatus[] = [...reviewerStatuses, "COMPLETED", "REJECTED"]
 
 const matchLabels: Record<DuplicateMatch["matches"][number], string> = {
   phone: "phone",
@@ -100,10 +102,12 @@ export function ApplicationReview({
   application,
   live,
   duplicates = [],
+  canFinalize = false,
 }: {
   application: Application
   live?: boolean
   duplicates?: DuplicateMatch[]
+  canFinalize?: boolean
 }) {
   const router = useRouter()
   const [activeDocId, setActiveDocId] = useState(application.documents[0]?.id)
@@ -414,7 +418,14 @@ export function ApplicationReview({
                     >
                       <span className="flex size-8 shrink-0 items-center justify-center overflow-hidden rounded bg-muted">
                         {doc.previewUrl ? (
-                          <Image src={doc.previewUrl} alt="" width={32} height={32} className="size-8 object-cover" />
+                          <Image
+                            src={doc.previewUrl}
+                            alt=""
+                            width={32}
+                            height={32}
+                            unoptimized
+                            className="size-8 object-cover"
+                          />
                         ) : (
                           <FileText className="size-4 text-muted-foreground" />
                         )}
@@ -456,6 +467,7 @@ export function ApplicationReview({
                       alt={activeDoc.name}
                       width={480}
                       height={320}
+                      unoptimized
                       className="max-h-72 w-full rounded-md object-cover"
                     />
                   ) : (
@@ -515,14 +527,17 @@ export function ApplicationReview({
 
           <div className="portal-card">
             <p className="mb-2 text-xs font-medium tracking-wide text-muted-foreground uppercase">Review Status</p>
-            <Select value={status} onValueChange={(v) => void changeStatus(v as AppStatus)}>
+            <Select value={status} onValueChange={(v) => void changeStatus(v as AppStatus)} disabled={busy}>
               <SelectTrigger className="w-full">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
                 <SelectGroup>
-                  {reviewStatuses.map((s) => (
-                    <SelectItem key={s} value={s}>
+                  {(canFinalize ? approverStatuses : reviewerStatuses)
+                    .concat(status === "COMPLETED" || status === "REJECTED" || status === "SUBMITTED" ? [status] : [])
+                    .filter((s, i, all) => all.indexOf(s) === i)
+                    .map((s) => (
+                    <SelectItem key={s} value={s} disabled={!canFinalize && (s === "COMPLETED" || s === "REJECTED")}>
                       {statusLabels[s]}
                     </SelectItem>
                   ))}
@@ -578,6 +593,8 @@ export function ApplicationReview({
             </Dialog>
           </div>
 
+          <ApplicationThread applicationId={application.id} live={live} audience="admin" />
+
           <div className="portal-table">
             <p className="border-b border-border px-4 py-3 text-sm font-semibold text-foreground">Activity Timeline</p>
             <ul className="flex flex-col gap-4 p-4">
@@ -621,6 +638,8 @@ export function ApplicationReview({
             </span>
           </div>
           <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:flex-wrap sm:justify-end">
+            {canFinalize ? (
+              <>
             <AlertDialog>
               <AlertDialogTrigger
                 render={<Button variant="outline" className="w-full text-destructive hover:text-destructive sm:w-auto" />}
@@ -665,6 +684,12 @@ export function ApplicationReview({
                 </AlertDialogFooter>
               </AlertDialogContent>
             </AlertDialog>
+              </>
+            ) : (
+              <p className="text-xs text-muted-foreground sm:text-right">
+                Reviewers can request correction. A final approver verifies or rejects the case.
+              </p>
+            )}
           </div>
         </div>
       </div>

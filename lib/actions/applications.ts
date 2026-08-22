@@ -2,7 +2,6 @@
 
 import type { Application, AppStatus } from "@/lib/admin-data"
 import { applicationDraftSchema, appStatusSchema, correctionRequestSchema } from "@/lib/backend/zod"
-import { DOCUMENTS_BUCKET } from "@/lib/storage/paths"
 import { countCompleteFields, assertAdminTransition } from "@/lib/backend/status"
 import { mapPrismaApplication, mapPrismaDocument, type PrismaApplicationBundle } from "@/lib/db/mappers"
 import { BackendError, NotFoundError } from "@/lib/backend/errors"
@@ -21,6 +20,7 @@ import { withDbGuards } from "@/lib/db/guards"
 import { emitNotification, writeAudit } from "@/lib/db/events"
 import { assertAgentOwnsApplication, assertAgentWritable, isStaffRole } from "@/lib/db/ownership"
 import { findLatestVerifications } from "@/lib/db/verification-store"
+import { attachSignedDocumentUrls } from "@/lib/storage/signed-urls"
 import { cache } from "react"
 import { Prisma } from "@prisma/client"
 
@@ -30,30 +30,40 @@ const applicationInclude = {
     orderBy: { createdAt: "desc" as const },
     include: { changedBy: { select: { fullName: true } } },
   },
-  deposit: true,
-  channel: true,
-  sector: true,
+  deposit: { select: { status: true, amount: true, reference: true, verifiedAt: true } },
+  channel: { select: { name: true } },
+  sector: { select: { name: true } },
   agent: { select: { agentCode: true } },
   correctionRequests: {
     where: { resolvedAt: null },
     orderBy: { createdAt: "desc" as const },
     take: 1,
-    include: { items: true },
+    include: { items: { select: { id: true, kind: true, target: true, reason: true } } },
   },
 } satisfies Prisma.ApplicationInclude
 
 const listInclude = {
-  documents: { where: { deletedAt: null }, include: { type: true } },
-  deposit: true,
-  channel: true,
-  sector: true,
-  agent: { select: { agentCode: true } },
-  correctionRequests: {
-    where: { resolvedAt: null },
-    orderBy: { createdAt: "desc" as const },
-    take: 1,
-    include: { items: true },
+  documents: {
+    where: { deletedAt: null },
+    select: {
+      id: true,
+      documentType: true,
+      status: true,
+      rejectionReason: true,
+      mimeType: true,
+      fileExtension: true,
+      verifiedById: true,
+      originalName: true,
+      storageKey: true,
+      fileSize: true,
+      adminUploaded: true,
+      type: { select: { name: true, required: true } },
+    },
   },
+  deposit: { select: { status: true, amount: true, reference: true, verifiedAt: true } },
+  channel: { select: { name: true } },
+  sector: { select: { name: true } },
+  agent: { select: { agentCode: true } },
 } satisfies Prisma.ApplicationInclude
 
 const LOOKUP_UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
@@ -92,15 +102,14 @@ async function loadApplicationBundle(applicationId: string) {
     assertAgentOwnsApplication(agent?.id, row.agentId)
   }
 
-  const mapped = mapApplicationWithChecks(row as PrismaApplicationBundle, await latestVerifications(row.documents.map((doc) => doc.id)))
-  mapped.documents = await Promise.all(
-    mapped.documents.map(async (doc, index) => {
-      const storageKey = row.documents[index]?.storageKey
-      if (!storageKey) return doc
-      const { data } = await supabase.storage.from(DOCUMENTS_BUCKET).createSignedUrl(storageKey, 60 * 10)
-      if (!data?.signedUrl) return doc
-      return { ...doc, previewUrl: data.signedUrl, fileUrl: data.signedUrl }
-    }),
+  const mapped = mapApplicationWithChecks(
+    row as unknown as PrismaApplicationBundle,
+    await latestVerifications(row.documents.map((doc) => doc.id)),
+  )
+  mapped.documents = await attachSignedDocumentUrls(
+    supabase,
+    mapped.documents,
+    row.documents.map((doc) => doc.storageKey),
   )
 
   return { prisma, profile, row, mapped, isAdmin }
@@ -141,11 +150,11 @@ export const listApplications = cache(async function listApplications(filters?: 
     include: listInclude,
   })
   return rows.map((row) =>
-    mapApplicationWithChecks({ ...row, statusHistory: [] } as PrismaApplicationBundle, new Map()),
+    mapApplicationWithChecks({ ...row, statusHistory: [] } as unknown as PrismaApplicationBundle, new Map()),
   )
 })
 
-export async function listApplicationSummaries() {
+export const listApplicationSummaries = cache(async function listApplicationSummaries() {
   const { profile } = await getAuthContext()
   const prisma = getPrisma()
   const isAdmin = isStaffRole(profile.role)
@@ -173,7 +182,7 @@ export async function listApplicationSummaries() {
     appNumber: row.applicationNumber ?? "DRAFT",
     status: row.status,
   }))
-}
+})
 
 export async function getApplication(id: string): Promise<Application> {
   const { mapped } = await loadApplicationBundle(id)
@@ -382,7 +391,7 @@ export async function saveDraft(patch: Record<string, unknown>) {
   await prisma.application.update({ where: { id: appId }, data })
 
   if (existing) {
-    return { id: appId, documents: [] } as Application
+    return { id: appId, documents: [] } as unknown as Application
   }
 
   const documents = await prisma.document.findMany({
@@ -728,7 +737,7 @@ export async function updateStatus(
   const next = appStatusSchema.parse(status)
   const { profile } = await requireAdmin()
   const { row } = await loadApplicationBundle(applicationId)
-  assertAdminTransition(row.status, next)
+  assertAdminTransition(row.status, next, profile.role)
 
   if (status === "REJECTED" && !note) throw new BackendError("APPLICATION", "A rejection reason is required")
 
@@ -844,27 +853,32 @@ export async function requestCorrection(
   return request.id
 }
 
-export async function findDuplicates(input: {
+async function lookupDuplicateMatches(input: {
   phone?: string
   idNumber?: string
   tinNumber?: string
   excludeId?: string
 }) {
-  await requireAdmin()
   const phone = input.phone?.trim() || ""
   const idNumber = input.idNumber?.trim() || ""
   const tinNumber = input.tinNumber?.trim() || ""
   if (!phone && !idNumber && !tinNumber) return []
 
+  const or: Prisma.ApplicationWhereInput[] = []
+  if (phone) or.push({ phone })
+  if (idNumber) or.push({ idNumber })
+  if (tinNumber) or.push({ tinNumber })
+
   const rows = await getPrisma().application.findMany({
     where: {
       deletedAt: null,
       status: { notIn: ["REJECTED", "DRAFT"] },
+      ...(input.excludeId ? { id: { not: input.excludeId } } : {}),
+      OR: or,
     },
     select: { id: true, applicationNumber: true, phone: true, idNumber: true, tinNumber: true, status: true },
   })
   return rows.flatMap((row) => {
-    if (input.excludeId && row.id === input.excludeId) return []
     const matches: Array<"phone" | "id" | "tin"> = []
     if (phone && row.phone === phone) matches.push("phone")
     if (idNumber && row.idNumber === idNumber) matches.push("id")
@@ -880,3 +894,71 @@ export async function findDuplicates(input: {
     ]
   })
 }
+
+export async function findDuplicates(input: {
+  phone?: string
+  idNumber?: string
+  tinNumber?: string
+  excludeId?: string
+}) {
+  await requireAdmin()
+  return lookupDuplicateMatches(input)
+}
+
+export async function checkIdentityDuplicates(input: {
+  phone?: string
+  idNumber?: string
+  tinNumber?: string
+  excludeId?: string
+}) {
+  const { profile } = await getAuthContext()
+  const prisma = getPrisma()
+  const staff = isStaffRole(profile.role)
+  let excludeId = input.excludeId
+  if (!staff) {
+    const agent = await prisma.agent.findUnique({ where: { userId: profile.id }, select: { id: true } })
+    if (excludeId) {
+      const owned = await prisma.application.findFirst({
+        where: { id: excludeId, agentId: agent?.id, deletedAt: null },
+        select: { id: true },
+      })
+      if (!owned) excludeId = undefined
+    }
+  }
+
+  const matches = await lookupDuplicateMatches({ ...input, excludeId })
+  if (staff) return { matches, id: matches.some((row) => row.matches.includes("id")), tin: matches.some((row) => row.matches.includes("tin")), phone: matches.some((row) => row.matches.includes("phone")) }
+  return {
+    matches: [],
+    id: matches.some((row) => row.matches.includes("id")),
+    tin: matches.some((row) => row.matches.includes("tin")),
+    phone: matches.some((row) => row.matches.includes("phone")),
+  }
+}
+
+export async function bulkUpdateStatus(
+  applicationIds: string[],
+  status: Extract<AppStatus, "COMPLETED" | "REJECTED">,
+  note?: string,
+) {
+  const ids = [...new Set(applicationIds)].slice(0, 50)
+  if (!ids.length) throw new BackendError("APPLICATION", "Select at least one application")
+  if (status === "REJECTED" && !note?.trim()) {
+    throw new BackendError("APPLICATION", "A rejection reason is required")
+  }
+
+  const results: Array<{ id: string; ok: boolean; error?: string }> = []
+  for (const id of ids) {
+    try {
+      await updateStatus(id, status, note)
+      results.push({ id, ok: true })
+    } catch (error) {
+      results.push({ id, ok: false, error: error instanceof Error ? error.message : "Could not update" })
+    }
+  }
+  return {
+    updated: results.filter((row) => row.ok).length,
+    failed: results.filter((row) => !row.ok),
+  }
+}
+

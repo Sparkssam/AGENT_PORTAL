@@ -19,6 +19,9 @@ import { PageBackLink } from "@/components/page-back-link"
 import { PageHeader } from "@/components/page-header"
 import { statusLabels, type AppStatus } from "@/lib/domain"
 import { cn } from "@/lib/utils"
+import { ThemeToggle } from "@/components/theme-toggle"
+import { StaffMfaForm } from "@/components/auth/staff-mfa-form"
+import { RetentionPanel } from "@/components/admin/retention-panel"
 
 type SettingsRow = {
   id: string
@@ -98,6 +101,7 @@ export function SettingsWorkspace({
   applicationStatus,
   memberSince,
   verified,
+  canFinalize = false,
 }: {
   portal: "agent" | "admin"
   email: string
@@ -107,6 +111,7 @@ export function SettingsWorkspace({
   applicationStatus?: AppStatus
   memberSince?: string
   verified?: boolean
+  canFinalize?: boolean
 }) {
   const [query, setQuery] = useState("")
   const isAgent = portal === "agent"
@@ -209,8 +214,8 @@ export function SettingsWorkspace({
             />
             <SummaryCard
               label="Security"
-              value="Password"
-              detail={live ? "Reset available by email" : "Backend not connected"}
+              value={isAgent ? "Password" : "Password + 2FA"}
+              detail={live ? (isAgent ? "Reset available by email" : "Authenticator required for staff") : "Backend not connected"}
               icon={KeyRound}
             />
             <SummaryCard
@@ -254,6 +259,11 @@ export function SettingsWorkspace({
             </div>
             <SettingsForm email={email} live={live} />
           </div>
+          {!isAgent && live ? (
+            <div className="portal-card">
+              <StaffMfaForm title="Authenticator app" variant="settings" />
+            </div>
+          ) : null}
         </TabsContent>
 
         <TabsContent value="notifications" className="flex flex-col gap-4">
@@ -276,10 +286,16 @@ export function SettingsWorkspace({
               </p>
             ) : (
               <p className="text-sm text-muted-foreground">
-                Agents receive in-app notices for correction, reject, and completed.
+                Agents receive in-app notices for correction, reject, and completed. Admins are signed out after 30
+                minutes of inactivity.
               </p>
             )}
+            <div className="mt-4 flex items-center gap-2">
+              <ThemeToggle />
+              <span className="text-sm text-muted-foreground">Light / dark appearance</span>
+            </div>
           </div>
+          {!isAgent && canFinalize ? <RetentionPanel /> : null}
         </TabsContent>
 
         {isAgent ? (

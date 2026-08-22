@@ -2,6 +2,7 @@
 
 import { getApplication, listApplications } from "@/lib/actions/applications"
 import { requireAdmin } from "@/lib/backend/session"
+import { filterApplications, type ApplicationListFilters } from "@/lib/applications/filters"
 
 export async function copyAllPayload(applicationId: string) {
   await requireAdmin()
@@ -33,9 +34,15 @@ export async function copyAllPayload(applicationId: string) {
   ].join("\n")
 }
 
-export async function applicationsCsv() {
+export async function applicationsCsv(filters?: ApplicationListFilters & { ids?: string[] }) {
   await requireAdmin()
-  const apps = await listApplications()
+  let apps = await listApplications()
+  if (filters?.ids?.length) {
+    const allowed = new Set(filters.ids)
+    apps = apps.filter((app) => allowed.has(app.id))
+  } else if (filters) {
+    apps = filterApplications(apps, filters)
+  }
   const header = [
     "application_number",
     "agent_name",
@@ -43,14 +50,26 @@ export async function applicationsCsv() {
     "email",
     "channel",
     "sector",
+    "region",
     "status",
     "deposit_status",
     "submitted_at",
   ]
   const lines = apps.map((app) =>
-    [app.appNumber, app.agentName, app.phone, app.email, app.channel, app.sector, app.status, app.depositStatus, app.submittedAt]
-      .map((value) => `"${String(value).replaceAll('"', '""')}"`)
+    [
+      app.appNumber,
+      app.agentName,
+      app.phone,
+      app.email,
+      app.channel,
+      app.sector,
+      app.province,
+      app.status,
+      app.depositStatus,
+      app.submittedAt,
+    ]
+      .map((value) => `"${String(value ?? "").replaceAll('"', '""')}"`)
       .join(","),
   )
-  return [header.join(","), ...lines].join("\n")
+  return `\uFEFF${[header.join(","), ...lines].join("\n")}`
 }

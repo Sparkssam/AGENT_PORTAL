@@ -6,6 +6,8 @@ import { PageHeader } from "@/components/page-header"
 import { AppStatusBadge, DepositStatusBadge } from "@/components/admin/status-badge"
 import { CaseHealthCard } from "@/components/case-health-card"
 import { CorrectionChecklist } from "@/components/correction-checklist"
+import { ApplicationThread } from "@/components/applications/application-thread"
+import { DocumentExpiryBanner } from "@/components/documents/expiry-banner"
 import { HelpHint } from "@/components/help/help-hint"
 import { formatCurrencyTZS } from "@/lib/format"
 import type { AppStatus } from "@/lib/domain"
@@ -73,6 +75,9 @@ export default async function ApplicationDetailPage({ params }: { params: Promis
       </div>
 
       <CaseHealthCard application={application} />
+      <DocumentExpiryBanner expireDate={application.expireDate} />
+
+      <ApplicationThread applicationId={application.id} live audience="agent" />
 
       {!isRejectedOrCorrection && (
         <div className="portal-card">

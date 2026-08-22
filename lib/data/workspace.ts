@@ -67,7 +67,7 @@ function setupFrom(error: unknown) {
     return {
       mode: "setup" as const,
       message:
-        "Supabase is configured but the schema is missing. Apply SQL in order from .env.example (init, seed, storage, mutation_guards, document_verifications, business_sectors, document_admin_upload).",
+        "Supabase is configured but the schema is missing. Apply SQL in order from .env.example (init, seed, storage, mutation_guards, document_verifications, business_sectors, document_admin_upload, performance_indexes).",
     }
   }
   return { mode: "setup" as const, message: raw }

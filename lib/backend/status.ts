@@ -1,3 +1,5 @@
+import { ForbiddenError } from "@/lib/backend/errors"
+import { isFinalApprover } from "@/lib/db/ownership"
 import type { AppStatus } from "@/lib/admin-data"
 
 export const ADMIN_REVIEW_STATUSES: AppStatus[] = [
@@ -8,8 +10,18 @@ export const ADMIN_REVIEW_STATUSES: AppStatus[] = [
   "REJECTED",
 ]
 
-/** Admin may move a case along this graph. Agents use submitApplication instead. */
-export const ALLOWED_ADMIN_TRANSITIONS: Record<AppStatus, AppStatus[]> = {
+/** Reviewers move work through the queue. Final approvers may also verify or reject the case. */
+export const ALLOWED_REVIEWER_TRANSITIONS: Record<AppStatus, AppStatus[]> = {
+  DRAFT: [],
+  SUBMITTED: ["PENDING_REVIEW"],
+  PENDING_REVIEW: ["IN_PROGRESS", "NEEDS_CORRECTION"],
+  IN_PROGRESS: ["NEEDS_CORRECTION", "PENDING_REVIEW"],
+  NEEDS_CORRECTION: [],
+  COMPLETED: [],
+  REJECTED: [],
+}
+
+export const ALLOWED_APPROVER_TRANSITIONS: Record<AppStatus, AppStatus[]> = {
   DRAFT: [],
   SUBMITTED: ["PENDING_REVIEW"],
   PENDING_REVIEW: ["IN_PROGRESS", "NEEDS_CORRECTION", "COMPLETED", "REJECTED"],
@@ -19,12 +31,26 @@ export const ALLOWED_ADMIN_TRANSITIONS: Record<AppStatus, AppStatus[]> = {
   REJECTED: [],
 }
 
+/** Admin may move a case along this graph. Agents use submitApplication instead. */
+export const ALLOWED_ADMIN_TRANSITIONS = ALLOWED_APPROVER_TRANSITIONS
+
 export const EDITABLE_STATUSES: AppStatus[] = ["DRAFT", "NEEDS_CORRECTION"]
 export const IN_REVIEW_STATUSES: AppStatus[] = ["SUBMITTED", "PENDING_REVIEW", "IN_PROGRESS"]
 export const CLOSED_STATUSES: AppStatus[] = ["COMPLETED", "REJECTED"]
+export const FINAL_DECISIONS: AppStatus[] = ["COMPLETED", "REJECTED"]
 
-export function assertAdminTransition(from: AppStatus, to: AppStatus) {
-  if (!ALLOWED_ADMIN_TRANSITIONS[from].includes(to)) {
+export function transitionsForRole(role: string): Record<AppStatus, AppStatus[]> {
+  return isFinalApprover(role) ? ALLOWED_APPROVER_TRANSITIONS : ALLOWED_REVIEWER_TRANSITIONS
+}
+
+export function assertAdminTransition(from: AppStatus, to: AppStatus, role?: string) {
+  const allowed = role ? transitionsForRole(role) : ALLOWED_APPROVER_TRANSITIONS
+  if (!allowed[from].includes(to)) {
+    if (FINAL_DECISIONS.includes(to) && role && !isFinalApprover(role)) {
+      throw new ForbiddenError(
+        "Only a final approver can verify or reject an application. Request a correction, or ask a super administrator to finish the case.",
+      )
+    }
     throw new Error(`Cannot change status from ${from} to ${to}`)
   }
 }

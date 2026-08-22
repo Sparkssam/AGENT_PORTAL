@@ -1,6 +1,3 @@
-"use client"
-
-import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { cn } from "@/lib/utils"
 
 export function WorkspaceIdentity({
@@ -19,9 +16,9 @@ export function WorkspaceIdentity({
         className,
       )}
     >
-      <Avatar className="size-8">
-        <AvatarFallback className="bg-primary text-[11px] text-primary-foreground">{initials}</AvatarFallback>
-      </Avatar>
+      <span className="flex size-8 items-center justify-center rounded-full bg-primary text-[11px] font-medium text-primary-foreground">
+        {initials}
+      </span>
       <span className="hidden min-w-0 text-left leading-tight sm:block">
         <span className="block truncate text-sm font-semibold text-foreground">{name}</span>
         <span className="block truncate text-[11px] text-muted-foreground">Kinetic</span>

@@ -157,6 +157,7 @@ model Profile {
   auditLogs             AuditLog[]
   documentVerifications DocumentVerification[] @relation("VerificationSubject")
   reviewedVerifications DocumentVerification[] @relation("VerificationReviewer")
+  applicationMessages   ApplicationMessage[]
 
   @@map("profiles")
 }
@@ -231,11 +232,17 @@ model Application {
   deposit             DepositRecord?
   statusHistory       StatusHistory[]
   correctionRequests  CorrectionRequest[]
+  messages            ApplicationMessage[]
 
   @@index([status], map: "applications_status_idx")
   @@index([agentId], map: "applications_agent_id_idx")
   @@index([phone], map: "applications_phone_idx")
   @@index([idNumber], map: "applications_id_number_idx")
+  @@index([updatedAt(sort: Desc)], map: "applications_updated_at_idx")
+  @@index([channelId], map: "applications_channel_id_idx")
+  @@index([sectorId], map: "applications_sector_id_idx")
+  @@index([submittedAt], map: "applications_submitted_at_idx")
+  @@index([tinNumber], map: "applications_tin_number_idx")
   @@map("applications")
 }
 
@@ -265,6 +272,8 @@ model Document {
   verifications  DocumentVerification[]
 
   @@index([applicationId], map: "documents_application_id_idx")
+  @@index([status], map: "documents_status_idx")
+  @@index([applicationId, documentType], map: "documents_application_type_idx")
   @@map("documents")
 }
 
@@ -286,6 +295,7 @@ model DepositRecord {
   proofDocument Document?   @relation("DepositProof", fields: [proofDocumentId], references: [id])
   verifiedBy    Profile?    @relation("DepositVerifier", fields: [verifiedById], references: [id])
 
+  @@index([status], map: "deposit_records_status_idx")
   @@map("deposit_records")
 }
 
@@ -317,7 +327,22 @@ model CorrectionRequest {
   requestedBy Profile           @relation(fields: [requestedById], references: [id])
   items       CorrectionItem[]
 
+  @@index([applicationId], map: "correction_requests_application_open_idx")
   @@map("correction_requests")
+}
+
+model ApplicationMessage {
+  id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  applicationId String   @map("application_id") @db.Uuid
+  authorId      String   @map("author_id") @db.Uuid
+  body          String
+  createdAt     DateTime @default(dbgenerated("timezone('utc', now())")) @map("created_at") @db.Timestamptz(6)
+
+  application Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  author      Profile     @relation(fields: [authorId], references: [id], onDelete: Cascade)
+
+  @@index([applicationId, createdAt], map: "application_messages_application_id_idx")
+  @@map("application_messages")
 }
 
 model CorrectionItem {
@@ -346,6 +371,7 @@ model Notification {
 
   user Profile @relation(fields: [userId], references: [id], onDelete: Cascade)
 
+  @@index([userId, createdAt(sort: Desc)], map: "notifications_user_created_idx")
   @@map("notifications")
 }
 
@@ -368,6 +394,7 @@ model AuditLog {
 
   @@index([createdAt(sort: Desc)], map: "audit_logs_created_at_idx")
   @@index([category], map: "audit_logs_category_idx")
+  @@index([actorId], map: "audit_logs_actor_id_idx")
   @@map("audit_logs")
 }
 
@@ -404,5 +431,6 @@ model DocumentVerification {
 
   @@index([documentId, createdAt(sort: Desc)], map: "document_verifications_document_id_idx")
   @@index([reviewStatus, createdAt(sort: Desc)], map: "document_verifications_review_status_idx")
+  @@index([applicationId], map: "document_verifications_application_id_idx")
   @@map("document_verifications")
 }

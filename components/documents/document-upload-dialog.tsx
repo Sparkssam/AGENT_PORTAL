@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useId, useMemo, useRef, useState } from "react"
+import Image from "next/image"
 import { CheckCircle2, CloudUpload, FileText, ImageIcon, Loader2, Trash2, Upload, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog"
@@ -207,7 +208,7 @@ export function DocumentUploadDialog({
     >
       <DialogContent
         showCloseButton={false}
-        className="gap-0 overflow-hidden p-0 sm:max-w-[440px]"
+        className="max-h-[100dvh] gap-0 overflow-y-auto p-0 max-sm:top-auto max-sm:bottom-0 max-sm:max-w-none max-sm:translate-y-0 max-sm:rounded-b-none sm:max-w-[440px]"
       >
         <div className="flex items-start gap-3 border-b border-border px-5 py-4">
           <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground">
@@ -354,7 +355,14 @@ export function DocumentUploadDialog({
               <div className="flex items-start gap-3 px-3 pt-3 pb-2">
                 {previewUrl ? (
                   <span className="flex size-11 shrink-0 overflow-hidden rounded-lg bg-muted">
-                    <img src={previewUrl} alt="" className="size-11 object-cover" />
+                    <Image
+                      src={previewUrl}
+                      alt=""
+                      width={44}
+                      height={44}
+                      unoptimized
+                      className="size-11 object-cover"
+                    />
                   </span>
                 ) : mimeFromFile(file).startsWith("image/") ? (
                   <span className="flex size-11 shrink-0 items-center justify-center rounded-lg bg-muted">

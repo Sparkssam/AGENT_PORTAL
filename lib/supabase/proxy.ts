@@ -59,11 +59,29 @@ export async function updateSession(request: NextRequest) {
   }
 
   const path = request.nextUrl.pathname
+  const staff = role === "admin"
+
+  let staffNeedsMfa = false
+  if (staff && userId) {
+    const { data: factors } = await supabase.auth.mfa.listFactors().catch(() => ({ data: null }))
+    const totpEnrolled = Boolean(factors?.totp?.some((factor) => factor.status === "verified"))
+    if (totpEnrolled) {
+      const { data: aal } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel().catch(() => ({ data: null }))
+      staffNeedsMfa = aal?.currentLevel !== "aal2"
+    }
+  }
 
   if ((path.startsWith("/agent") || path.startsWith("/admin")) && !userId) {
     const login = request.nextUrl.clone()
     login.pathname = "/login"
     login.searchParams.set("next", path)
+    return NextResponse.redirect(login)
+  }
+
+  if (staffNeedsMfa && path.startsWith("/admin")) {
+    const login = request.nextUrl.clone()
+    login.pathname = "/login"
+    login.searchParams.set("mfa", "1")
     return NextResponse.redirect(login)
   }
 
@@ -75,6 +93,7 @@ export async function updateSession(request: NextRequest) {
       return NextResponse.redirect(new URL(dashboardPathFor("admin"), request.url))
     }
     if ((path === "/login" || path === "/register") && role) {
+      if (staffNeedsMfa) return supabaseResponse
       return NextResponse.redirect(new URL(dashboardPathFor(role), request.url))
     }
   }

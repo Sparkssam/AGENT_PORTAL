@@ -27,7 +27,7 @@ export function WizardSteps({ steps, current }: { steps: WizardStep[]; current: 
               </span>
               <span
                 className={cn(
-                  "hidden max-w-24 text-center text-xs font-medium sm:block",
+                  "max-w-16 text-center text-[10px] font-medium leading-tight sm:max-w-24 sm:text-xs",
                   state === "upcoming" ? "text-muted-foreground" : "text-foreground",
                 )}
               >

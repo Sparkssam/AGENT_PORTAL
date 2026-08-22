@@ -1,4 +1,5 @@
 export type UserRole = "admin" | "agent"
+export type StaffDuty = "reviewer" | "approver"
 
 export interface SessionUser {
   id?: string
@@ -7,6 +8,8 @@ export interface SessionUser {
   email: string
   title: string
   initials: string
+  staffDuty?: StaffDuty
+  canFinalize?: boolean
 }
 
 const SESSION_KEY = "kinetic.session"

@@ -15,7 +15,8 @@ export default async function AdminSettingsPage() {
         email={session?.email ?? ""}
         name={session?.name ?? "Admin"}
         live={live}
-        role={session?.title ?? "Administrator"}
+        role={session?.title ?? "Reviewer"}
+        canFinalize={Boolean(session?.canFinalize)}
       />
     </div>
   )

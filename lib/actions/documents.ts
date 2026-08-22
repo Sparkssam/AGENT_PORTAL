@@ -19,7 +19,27 @@ async function getOwnedDocument(documentId: string) {
   const isAdmin = isStaffRole(profile.role)
   const doc = await prisma.document.findFirst({
     where: { id: documentId, deletedAt: null },
-    include: { type: true, application: true },
+    select: {
+      id: true,
+      applicationId: true,
+      documentType: true,
+      status: true,
+      storageKey: true,
+      originalName: true,
+      mimeType: true,
+      fileSize: true,
+      fileExtension: true,
+      type: true,
+      application: {
+        select: {
+          id: true,
+          agentId: true,
+          applicationNumber: true,
+          agentName: true,
+          status: true,
+        },
+      },
+    },
   })
   if (!doc) throw new NotFoundError("Document not found")
 

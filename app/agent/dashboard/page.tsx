@@ -10,6 +10,10 @@ import { formatCurrencyTZS, formatDateLong, formatPhoneTZ } from "@/lib/format"
 import { computeCaseHealth } from "@/lib/domain"
 import { isClosedStatus, isInReviewStatus } from "@/lib/backend/status"
 import { AgentDocumentChecklist } from "./document-checklist"
+import { DocumentExpiryBanner } from "@/components/documents/expiry-banner"
+import { AgentOnboardingChecklist } from "@/components/agent/onboarding-checklist"
+import { ApplicationThread } from "@/components/applications/application-thread"
+import { documentSlotProgress } from "@/lib/documents/catalog"
 import { redirect } from "next/navigation"
 
 const quickLinks = [
@@ -33,6 +37,14 @@ export default async function AgentDashboardPage() {
   const depositDate = formatDateLong(currentApplication.depositVerifiedAt || currentApplication.submittedAt, "local")
   const health = computeCaseHealth(currentApplication)
   const firstName = currentAgent.fullName.split(" ")[0] || "there"
+  const docsProgress = documentSlotProgress(currentApplication.documents)
+  const onboardingItems = [
+    { id: "profile", label: "Confirm your name and phone on Profile", done: Boolean(currentAgent.fullName && currentAgent.phone), href: "/agent/profile" },
+    { id: "details", label: "Fill personal, business, and location details", done: health.fieldsComplete >= health.fieldsTotal, href: "/agent/apply" },
+    { id: "docs", label: "Upload required documents", done: docsProgress.remaining === 0 && docsProgress.requiredTotal > 0, href: "/agent/apply" },
+    { id: "deposit", label: "Add deposit reference and proof", done: Boolean(currentApplication.depositReference) && currentApplication.depositStatus !== "PENDING", href: "/agent/apply" },
+    { id: "submit", label: "Submit your application", done: currentApplication.status !== "DRAFT", href: "/agent/apply" },
+  ]
 
   return (
     <div className="portal-page">
@@ -47,6 +59,9 @@ export default async function AgentDashboardPage() {
               : `Welcome, ${firstName}. Finish your application and keep documents in one place.`
         }
       />
+
+      <DocumentExpiryBanner expireDate={currentApplication.expireDate} />
+      {!completed && !inReview ? <AgentOnboardingChecklist items={onboardingItems} /> : null}
 
       <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
         <section className="portal-card lg:col-span-2 md:p-8">
@@ -143,6 +158,10 @@ export default async function AgentDashboardPage() {
           </div>
         </section>
       </div>
+
+      {mode === "live" && currentApplication.id && currentApplication.id !== "draft" ? (
+        <ApplicationThread applicationId={currentApplication.id} live audience="agent" />
+      ) : null}
 
       <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
         <div className="lg:col-span-2">

@@ -160,6 +160,8 @@ export function mapPrismaNotification(row: {
   message: string
   createdAt: Date
   readAt: Date | null
+  entityType?: string | null
+  entityId?: string | null
 }): AgentNotification {
   return {
     id: row.id,
@@ -168,24 +170,30 @@ export function mapPrismaNotification(row: {
     detail: row.message,
     timestamp: iso(row.createdAt),
     read: Boolean(row.readAt),
+    entityType: row.entityType,
+    entityId: row.entityId,
   }
 }
 
-export function mapPrismaAudit(row: {
-  id: string
-  actorId: string | null
-  actorRole: string | null
-  category: AuditLogEntry["category"]
-  severity: AuditLogEntry["severity"]
-  action: string
-  detail: string
-  target: string | null
-  ipAddress: string | null
-  createdAt: Date
-}): AuditLogEntry {
+export function mapPrismaAudit(
+  row: {
+    id: string
+    actorId: string | null
+    actorRole: string | null
+    category: AuditLogEntry["category"]
+    severity: AuditLogEntry["severity"]
+    action: string
+    detail: string
+    target: string | null
+    ipAddress: string | null
+    createdAt: Date
+  },
+  actorName?: string,
+): AuditLogEntry {
+  const looksLikeId = Boolean(row.actorId && /^[0-9a-f-]{36}$/i.test(row.actorId))
   return {
     id: row.id,
-    actor: row.actorId ?? "System",
+    actor: actorName || (looksLikeId ? "Unknown user" : row.actorId) || "System",
     actorRole: row.actorRole ?? "System",
     category: row.category,
     severity: row.severity,

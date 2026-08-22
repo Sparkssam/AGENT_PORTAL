@@ -10,6 +10,7 @@ import {
 import { SetupBanner } from "@/components/setup-banner"
 import { PageBackLink } from "@/components/page-back-link"
 import { PageHeader } from "@/components/page-header"
+import { DocumentExpiryBanner } from "@/components/documents/expiry-banner"
 import { redirect } from "next/navigation"
 
 export const dynamic = "force-dynamic"
@@ -57,6 +58,7 @@ export default async function ApplyPage() {
           ) : null
         }
       />
+      <DocumentExpiryBanner expireDate={application.expireDate} />
       {application.status === "NEEDS_CORRECTION" ? (
         <CorrectionChecklist
           documents={application.documents}

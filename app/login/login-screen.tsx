@@ -11,6 +11,8 @@ import { Label } from "@/components/ui/label"
 import { Checkbox } from "@/components/ui/checkbox"
 import { useAuth } from "@/lib/auth-context"
 import { dashboardPathFor } from "@/lib/auth"
+import { getMfaStatus } from "@/lib/actions/mfa"
+import { StaffMfaForm } from "@/components/auth/staff-mfa-form"
 import { cn } from "@/lib/utils"
 
 function errorMessage(err: unknown) {
@@ -18,7 +20,15 @@ function errorMessage(err: unknown) {
   return "Something went wrong. Try again."
 }
 
-export function LoginScreen({ initialMode = "signin" }: { initialMode?: "signin" | "signup" }) {
+export function LoginScreen({
+  initialMode = "signin",
+  timedOut = false,
+  needsMfa = false,
+}: {
+  initialMode?: "signin" | "signup"
+  timedOut?: boolean
+  needsMfa?: boolean
+}) {
   const { login, register } = useAuth()
   const [mode, setMode] = useState<"signin" | "signup">(initialMode)
   const [email, setEmail] = useState("")
@@ -29,8 +39,24 @@ export function LoginScreen({ initialMode = "signin" }: { initialMode?: "signin"
   const [agreed, setAgreed] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
   const [loading, setLoading] = useState(false)
+  const [mfaUserRole, setMfaUserRole] = useState<"admin" | "agent" | null>(needsMfa ? "admin" : null)
   const [error, setError] = useState<string | null>(null)
-  const [notice, setNotice] = useState<string | null>(null)
+  const [notice, setNotice] = useState<string | null>(
+    timedOut ? "You were signed out after 30 minutes of inactivity." : null,
+  )
+
+  async function continueAfterAuth(role: "admin" | "agent") {
+    if (role !== "admin") {
+      window.location.assign(dashboardPathFor(role))
+      return
+    }
+    const mfa = await getMfaStatus()
+    if (!mfa.required || mfa.verified) {
+      window.location.assign(dashboardPathFor(role))
+      return
+    }
+    setMfaUserRole(role)
+  }
 
   async function handleSignIn(e: React.FormEvent) {
     e.preventDefault()
@@ -38,12 +64,12 @@ export function LoginScreen({ initialMode = "signin" }: { initialMode?: "signin"
     setNotice(null)
     setLoading(true)
     try {
-      const user = await login(email, password)
-      if (!user) {
+      const nextUser = await login(email, password)
+      if (!nextUser) {
         setError("We couldn't match those credentials. Check your email and password.")
         return
       }
-      window.location.assign(dashboardPathFor(user.role))
+      await continueAfterAuth(nextUser.role)
     } catch (err) {
       setError(errorMessage(err))
     } finally {
@@ -77,14 +103,22 @@ export function LoginScreen({ initialMode = "signin" }: { initialMode?: "signin"
 
   return (
     <AuthShell
-      title={mode === "signin" ? "Sign in to Kinetic" : "Create your agent account"}
+      title={
+        mfaUserRole
+          ? "Confirm it is you"
+          : mode === "signin"
+            ? "Sign in to Kinetic"
+            : "Create your agent account"
+      }
       description={
-        mode === "signin"
-          ? "Use the email and password from your registration."
-          : "Register with your real details. This creates your live Kinetic account."
+        mfaUserRole
+          ? "Staff accounts need an authenticator app before opening the admin workspace."
+          : mode === "signin"
+            ? "Use the email and password from your registration."
+            : "Register with your real details. This creates your live Kinetic account."
       }
       footer={
-        mode === "signin" ? (
+        mfaUserRole ? null : mode === "signin" ? (
           <>
             First time here?{" "}
             <button
@@ -116,6 +150,10 @@ export function LoginScreen({ initialMode = "signin" }: { initialMode?: "signin"
         )
       }
     >
+      {mfaUserRole ? (
+        <StaffMfaForm onComplete={() => window.location.assign(dashboardPathFor(mfaUserRole))} />
+      ) : (
+        <>
       <div className="mb-4 grid grid-cols-2 rounded-lg bg-muted p-1">
         <button
           type="button"
@@ -313,6 +351,8 @@ export function LoginScreen({ initialMode = "signin" }: { initialMode?: "signin"
             )}
           </Button>
         </form>
+      )}
+        </>
       )}
     </AuthShell>
   )

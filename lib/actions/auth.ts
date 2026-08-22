@@ -10,6 +10,7 @@ import { ensureUserRecords, roleFromAppMetadata, updateProfileRecord } from "@/l
 import { emitNotification, writeAudit } from "@/lib/db/events"
 import { getPrisma } from "@/lib/prisma"
 import { createAdminClient } from "@/lib/supabase/admin"
+import { assertLoginRateLimit } from "@/lib/rate-limit"
 
 export async function getSession(): Promise<SessionUser | null> {
   if (!isSupabaseConfigured() || !isPrismaConfigured()) return null
@@ -38,6 +39,12 @@ async function resolveLoginEmail(identifier: string) {
 export async function signIn(identifier: string, password: string) {
   const supabase = await requireConfiguredClient()
   const email = await resolveLoginEmail(identifier)
+  const ip = await clientIp()
+  try {
+    await assertLoginRateLimit(email, ip)
+  } catch (error) {
+    if (error instanceof BackendError && error.code === "RATE_LIMIT") throw error
+  }
   const { data, error } = await supabase.auth.signInWithPassword({
     email,
     password,

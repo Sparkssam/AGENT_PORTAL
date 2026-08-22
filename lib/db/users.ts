@@ -11,8 +11,8 @@ export function roleFromAppMetadata(appMetadata: unknown): UserRole | undefined 
 }
 
 function titleForRole(role: UserRole) {
-  if (role === "super_admin") return "Super Administrator"
-  if (role === "admin") return "Administrator"
+  if (role === "super_admin") return "Final approver"
+  if (role === "admin") return "Reviewer"
   return "Registered Agent"
 }
 

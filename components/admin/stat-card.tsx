@@ -6,6 +6,7 @@ interface StatCardProps {
   value: string | number
   icon: LucideIcon
   tone?: "default" | "warning" | "success" | "destructive" | "accent"
+  hint?: string
 }
 
 const toneDot: Record<Required<StatCardProps>["tone"], string> = {
@@ -16,7 +17,13 @@ const toneDot: Record<Required<StatCardProps>["tone"], string> = {
   accent: "bg-accent",
 }
 
-export function StatCard({ label, value, icon: Icon, tone = "default" }: StatCardProps) {
+export function StatCard({
+  label,
+  value,
+  icon: Icon,
+  tone = "default",
+  hint,
+}: StatCardProps) {
   return (
     <div className="portal-stat-card">
       <div className="flex items-center justify-between">
@@ -26,9 +33,12 @@ export function StatCard({ label, value, icon: Icon, tone = "default" }: StatCar
         </div>
         <Icon className="size-4 text-muted-foreground/60" />
       </div>
-      <p className="font-mono text-2xl font-medium tabular-nums tracking-tight text-foreground">
-        {typeof value === "number" ? value.toLocaleString("en-US") : value}
-      </p>
+      <div>
+        <p className="font-mono text-2xl font-medium tabular-nums tracking-tight text-foreground">
+          {typeof value === "number" ? value.toLocaleString("en-US") : value}
+        </p>
+        {hint ? <p className="mt-1 text-xs text-muted-foreground">{hint}</p> : null}
+      </div>
     </div>
   )
 }

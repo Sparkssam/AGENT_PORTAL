@@ -3,6 +3,7 @@ import type { Metadata, Viewport } from 'next'
 import { IBM_Plex_Sans, IBM_Plex_Mono } from 'next/font/google'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { AuthProvider } from '@/lib/auth-context'
+import { ThemeProvider } from '@/lib/theme'
 import './globals.css'
 
 const ibmPlexSans = IBM_Plex_Sans({
@@ -10,6 +11,8 @@ const ibmPlexSans = IBM_Plex_Sans({
   weight: ['400', '500', '600'],
   variable: '--font-ibm-plex-sans',
   display: 'swap',
+  fallback: ['ui-sans-serif', 'system-ui', 'sans-serif'],
+  adjustFontFallback: true,
 })
 
 const ibmPlexMono = IBM_Plex_Mono({
@@ -18,6 +21,8 @@ const ibmPlexMono = IBM_Plex_Mono({
   variable: '--font-ibm-plex-mono',
   display: 'swap',
   preload: false,
+  fallback: ['ui-monospace', 'monospace'],
+  adjustFontFallback: true,
 })
 
 export const metadata: Metadata = {
@@ -45,8 +50,11 @@ export const metadata: Metadata = {
 }
 
 export const viewport: Viewport = {
-  colorScheme: 'light',
-  themeColor: [{ media: '(prefers-color-scheme: light)', color: '#DBDAD6' }],
+  colorScheme: 'light dark',
+  themeColor: [
+    { media: '(prefers-color-scheme: light)', color: '#DBDAD6' },
+    { media: '(prefers-color-scheme: dark)', color: '#2A2A28' },
+  ],
   userScalable: true,
 }
 
@@ -56,11 +64,20 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   return (
-    <html lang="en" className={`${ibmPlexSans.variable} ${ibmPlexMono.variable} h-dvh bg-background`}>
-      <body className="m-0 h-dvh w-full overflow-hidden p-0 font-sans antialiased">
-        <AuthProvider>
-          <TooltipProvider delay={150}>{children}</TooltipProvider>
-        </AuthProvider>
+    <html lang="en" className={`${ibmPlexSans.variable} ${ibmPlexMono.variable} h-dvh bg-background`} suppressHydrationWarning>
+      <head>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `try{if(localStorage.getItem('kinetic.theme')==='dark'){document.documentElement.classList.add('dark');document.documentElement.style.colorScheme='dark'}}catch(e){}`,
+          }}
+        />
+      </head>
+      <body className={`${ibmPlexSans.className} m-0 h-dvh w-full overflow-hidden p-0 font-sans antialiased`}>
+        <ThemeProvider>
+          <AuthProvider>
+            <TooltipProvider delay={150}>{children}</TooltipProvider>
+          </AuthProvider>
+        </ThemeProvider>
         {process.env.NODE_ENV === 'production' && <Analytics />}
       </body>
     </html>

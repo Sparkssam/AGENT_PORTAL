@@ -1,9 +1,10 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
-import Link from "next/link"
-import { Search } from "lucide-react"
+import { ClipboardList, Search } from "lucide-react"
 import { Input } from "@/components/ui/input"
+import { Button } from "@/components/ui/button"
+import { ApplicationReviewModal } from "@/components/admin/application-review-modal"
 import {
   Select,
   SelectContent,
@@ -12,7 +13,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { AppStatusBadge, DepositStatusBadge } from "@/components/admin/status-badge"
+import { AppStatusBadge } from "@/components/admin/status-badge"
 import { TablePagination } from "@/components/table-pagination"
 import { computeCaseHealth, statusLabels, type Application, type AppStatus, type HealthTone } from "@/lib/domain"
 import { NETWORK_CHANNELS, channelMatchesFilter } from "@/lib/lookups/catalog"
@@ -39,14 +40,18 @@ const healthMeta: Record<HealthTone, { label: string; className: string }> = {
 export function ApplicationsTable({
   applications,
   initialQuery = "",
+  live = false,
 }: {
   applications: Application[]
   initialQuery?: string
+  live?: boolean
 }) {
   const [query, setQuery] = useState(initialQuery)
   const [status, setStatus] = useState<string>("all")
   const [channel, setChannel] = useState<string>("all")
   const [page, setPage] = useState(1)
+  const [reviewAppId, setReviewAppId] = useState<string | null>(null)
+  const [reviewOpen, setReviewOpen] = useState(false)
 
   useEffect(() => {
     setQuery(initialQuery)
@@ -148,7 +153,7 @@ export function ApplicationsTable({
                 <th className="px-4 py-3">Sector</th>
                 <th className="px-4 py-3">Health</th>
                 <th className="px-4 py-3">App Status</th>
-                <th className="px-4 py-3">Dep. Status</th>
+                <th className="px-4 py-3 text-right">Action</th>
               </tr>
             </thead>
             <tbody>
@@ -157,10 +162,8 @@ export function ApplicationsTable({
                 const meta = healthMeta[health.tone]
                 return (
                 <tr key={app.id} className="portal-table-row">
-                  <td className="px-4 py-3.5">
-                    <Link href={`/admin/applications/${app.id}`} className="font-mono text-sm font-medium text-foreground hover:underline">
-                      {app.appNumber}
-                    </Link>
+                  <td className="px-4 py-3.5 font-mono text-sm font-medium text-foreground">
+                    {app.appNumber}
                   </td>
                   <td className="px-4 py-3.5 text-foreground">{app.agentName}</td>
                   <td className="px-4 py-3.5 font-mono text-muted-foreground">{app.phone}</td>
@@ -178,8 +181,19 @@ export function ApplicationsTable({
                   <td className="px-4 py-3.5">
                     <AppStatusBadge status={app.status} />
                   </td>
-                  <td className="px-4 py-3.5">
-                    <DepositStatusBadge status={app.depositStatus} />
+                  <td className="px-4 py-3.5 text-right">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        setReviewAppId(app.id)
+                        setReviewOpen(true)
+                      }}
+                      aria-label={`Review ${app.appNumber}`}
+                    >
+                      <ClipboardList data-icon="inline-start" />
+                      Review
+                    </Button>
                   </td>
                 </tr>
               )})}
@@ -205,6 +219,17 @@ export function ApplicationsTable({
           noun="applications"
         />
       </div>
+
+      <ApplicationReviewModal
+        applicationId={reviewAppId}
+        open={reviewOpen}
+        onOpenChange={(open) => {
+          setReviewOpen(open)
+          if (!open) setReviewAppId(null)
+        }}
+        live={live}
+        initialApplication={applications.find((app) => app.id === reviewAppId)}
+      />
     </div>
   )
 }

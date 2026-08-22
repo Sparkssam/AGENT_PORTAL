@@ -5,12 +5,12 @@ import { storedDocumentFileName } from "@/lib/domain"
 import { zipStoredFiles } from "@/lib/documents/zip"
 import { writeAudit } from "@/lib/db/events"
 import { getPrisma } from "@/lib/prisma"
-import { DOCUMENTS_BUCKET } from "@/lib/storage/paths"
+import { fetchStoredObject } from "@/lib/storage/resolver"
 
 const BULK_LIMIT = 50
 
 export async function zipAcceptedDocuments(rawIds: string[]) {
-  const { supabase, profile } = await requireAdmin()
+  const { profile } = await requireAdmin()
   const ids = [...new Set(rawIds.map((id) => uuidSchema.parse(id)))].slice(0, BULK_LIMIT)
   if (ids.length === 0) {
     return {
@@ -41,21 +41,21 @@ export async function zipAcceptedDocuments(rawIds: string[]) {
       skipped += 1
       continue
     }
-    const { data, error } = await supabase.storage.from(DOCUMENTS_BUCKET).download(row.storageKey)
-    if (error || !data) {
+    try {
+      const stored = await fetchStoredObject(row.storageKey)
+      const bytes = new Uint8Array(stored.buffer)
+      const name = storedDocumentFileName({
+        agentName: row.application.agentName ?? "agent",
+        agentCode: row.application.agent.agentCode,
+        agentId: row.application.agentId,
+        documentType: row.type?.code ?? row.documentType,
+        extension: row.fileExtension ?? "png",
+      })
+      files.push({ name, data: bytes })
+      included.push(name)
+    } catch {
       skipped += 1
-      continue
     }
-    const bytes = new Uint8Array(await data.arrayBuffer())
-    const name = storedDocumentFileName({
-      agentName: row.application.agentName ?? "agent",
-      agentCode: row.application.agent.agentCode,
-      agentId: row.application.agentId,
-      documentType: row.type?.code ?? row.documentType,
-      extension: row.fileExtension ?? "png",
-    })
-    files.push({ name, data: bytes })
-    included.push(name)
   }
 
   if (files.length) {

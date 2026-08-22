@@ -5,16 +5,16 @@ import { BackendError, ForbiddenError, NotFoundError } from "@/lib/backend/error
 import { canAgentChangeDocument, isClosedStatus } from "@/lib/backend/status"
 import { getAuthContext } from "@/lib/backend/session"
 import { clientIp } from "@/lib/backend/request"
-import { DOCUMENTS_BUCKET } from "@/lib/storage/paths"
 import { getPrisma } from "@/lib/prisma"
 import { withDbGuards } from "@/lib/db/guards"
 import { emitNotification, writeAudit } from "@/lib/db/events"
 import { assertAgentOwnsApplication, assertAgentWritable, isStaffRole } from "@/lib/db/ownership"
 import { processDocumentUpload } from "@/lib/documents/process-upload"
 import { getApplication } from "@/lib/actions/applications"
+import { removeStoredObject, signedStoredUrl } from "@/lib/storage/resolver"
 
 async function getOwnedDocument(documentId: string) {
-  const { supabase, profile } = await getAuthContext()
+  const { profile } = await getAuthContext()
   const prisma = getPrisma()
   const isAdmin = isStaffRole(profile.role)
   const doc = await prisma.document.findFirst({
@@ -28,7 +28,7 @@ async function getOwnedDocument(documentId: string) {
     assertAgentOwnsApplication(agent?.id, doc.application.agentId)
   }
 
-  return { supabase, prisma, profile, isAdmin, doc, app: doc.application, type: doc.type }
+  return { prisma, profile, isAdmin, doc, app: doc.application, type: doc.type }
 }
 
 export async function uploadDocumentFile(formData: FormData) {
@@ -121,7 +121,7 @@ export async function rejectDocument(documentId: string, reason: string) {
 }
 
 export async function clearDocumentFile(documentId: string) {
-  const { supabase, profile, isAdmin, doc, app, type } = await getOwnedDocument(documentId)
+  const { profile, isAdmin, doc, app, type } = await getOwnedDocument(documentId)
   if (!isAdmin) {
     const agent = await getPrisma().agent.findUnique({ where: { userId: profile.id } })
     assertAgentWritable(agent?.status)
@@ -164,7 +164,7 @@ export async function clearDocumentFile(documentId: string) {
   })
 
   if (doc.storageKey) {
-    await supabase.storage.from(DOCUMENTS_BUCKET).remove([doc.storageKey])
+    await removeStoredObject(doc.storageKey)
   }
 
   await writeAudit({
@@ -183,13 +183,8 @@ export async function clearDocumentFile(documentId: string) {
 }
 
 export async function signedGet(documentId: string, disposition: "inline" | "attachment" = "inline") {
-  const { supabase, profile, doc, app, type } = await getOwnedDocument(documentId)
+  const { profile, doc, app, type } = await getOwnedDocument(documentId)
   if (!doc.storageKey) throw new BackendError("DOCUMENT", "No file uploaded")
-
-  const { data, error } = await supabase.storage.from(DOCUMENTS_BUCKET).createSignedUrl(doc.storageKey, 60 * 10, {
-    download: disposition === "attachment" ? true : undefined,
-  })
-  if (error || !data?.signedUrl) throw new BackendError("DOCUMENT", error?.message ?? "Could not sign download")
 
   const owner = await getPrisma().agent.findUnique({ where: { id: app.agentId }, select: { agentCode: true } })
   const filename = storedDocumentFileName({
@@ -199,6 +194,8 @@ export async function signedGet(documentId: string, disposition: "inline" | "att
     documentType: type?.code ?? doc.documentType,
     extension: doc.fileExtension ?? "png",
   })
+
+  const getUrl = await signedStoredUrl(doc.storageKey, { filename, disposition })
 
   if (disposition === "attachment") {
     await writeAudit({
@@ -213,5 +210,5 @@ export async function signedGet(documentId: string, disposition: "inline" | "att
       ipAddress: await clientIp(),
     })
   }
-  return { getUrl: data.signedUrl, filename }
+  return { getUrl, filename }
 }

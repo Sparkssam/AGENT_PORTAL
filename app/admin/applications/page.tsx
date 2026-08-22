@@ -20,7 +20,7 @@ export default async function ApplicationsPage({
         action={<ExportCsvButton live={mode === "live"} />}
       />
 
-      <ApplicationsTable applications={applications} initialQuery={q ?? ""} />
+      <ApplicationsTable applications={applications} initialQuery={q ?? ""} live={mode === "live"} />
     </div>
   )
 }

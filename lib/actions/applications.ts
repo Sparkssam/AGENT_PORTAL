@@ -2,7 +2,7 @@
 
 import type { Application, AppStatus } from "@/lib/admin-data"
 import { applicationDraftSchema, appStatusSchema, correctionRequestSchema } from "@/lib/backend/zod"
-import { DOCUMENTS_BUCKET } from "@/lib/storage/paths"
+import { signedStoredUrl } from "@/lib/storage/resolver"
 import { countCompleteFields, assertAdminTransition } from "@/lib/backend/status"
 import { mapPrismaApplication, mapPrismaDocument, type PrismaApplicationBundle } from "@/lib/db/mappers"
 import { BackendError, NotFoundError } from "@/lib/backend/errors"
@@ -77,7 +77,7 @@ function mapApplicationWithChecks(
 }
 
 async function loadApplicationBundle(applicationId: string) {
-  const { supabase, profile } = await getAuthContext()
+  const { profile } = await getAuthContext()
   const prisma = getPrisma()
   const isAdmin = isStaffRole(profile.role)
 
@@ -97,9 +97,12 @@ async function loadApplicationBundle(applicationId: string) {
     mapped.documents.map(async (doc, index) => {
       const storageKey = row.documents[index]?.storageKey
       if (!storageKey) return doc
-      const { data } = await supabase.storage.from(DOCUMENTS_BUCKET).createSignedUrl(storageKey, 60 * 10)
-      if (!data?.signedUrl) return doc
-      return { ...doc, previewUrl: data.signedUrl, fileUrl: data.signedUrl }
+      try {
+        const signedUrl = await signedStoredUrl(storageKey, { disposition: "inline" })
+        return { ...doc, previewUrl: signedUrl, fileUrl: signedUrl }
+      } catch {
+        return doc
+      }
     }),
   )
 
@@ -381,18 +384,7 @@ export async function saveDraft(patch: Record<string, unknown>) {
 
   await prisma.application.update({ where: { id: appId }, data })
 
-  if (existing) {
-    return { id: appId, documents: [] } as Application
-  }
-
-  const documents = await prisma.document.findMany({
-    where: { applicationId: appId, deletedAt: null },
-    include: { type: true },
-  })
-  return {
-    id: appId,
-    documents: documents.map((doc) => mapPrismaDocument(doc)),
-  } as Application
+  return getApplication(appId)
 }
 
 async function seedDevelopmentSubmission(applicationId: string, profile: { fullName: string; email: string; phone: string | null }) {

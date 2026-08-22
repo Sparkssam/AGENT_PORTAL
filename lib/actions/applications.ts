@@ -2,6 +2,7 @@
 
 import type { Application, AppStatus } from "@/lib/admin-data"
 import { applicationDraftSchema, appStatusSchema, correctionRequestSchema } from "@/lib/backend/zod"
+import { signedStoredUrl } from "@/lib/storage/resolver"
 import { countCompleteFields, assertAdminTransition } from "@/lib/backend/status"
 import { mapPrismaApplication, mapPrismaDocument, type PrismaApplicationBundle } from "@/lib/db/mappers"
 import { BackendError, NotFoundError } from "@/lib/backend/errors"
@@ -20,7 +21,6 @@ import { withDbGuards } from "@/lib/db/guards"
 import { emitNotification, writeAudit } from "@/lib/db/events"
 import { assertAgentOwnsApplication, assertAgentWritable, isStaffRole } from "@/lib/db/ownership"
 import { findLatestVerifications } from "@/lib/db/verification-store"
-import { attachSignedDocumentUrls } from "@/lib/storage/signed-urls"
 import { cache } from "react"
 import { Prisma } from "@prisma/client"
 
@@ -87,7 +87,7 @@ function mapApplicationWithChecks(
 }
 
 async function loadApplicationBundle(applicationId: string) {
-  const { supabase, profile } = await getAuthContext()
+  const { profile } = await getAuthContext()
   const prisma = getPrisma()
   const isAdmin = isStaffRole(profile.role)
 
@@ -102,14 +102,18 @@ async function loadApplicationBundle(applicationId: string) {
     assertAgentOwnsApplication(agent?.id, row.agentId)
   }
 
-  const mapped = mapApplicationWithChecks(
-    row as unknown as PrismaApplicationBundle,
-    await latestVerifications(row.documents.map((doc) => doc.id)),
-  )
-  mapped.documents = await attachSignedDocumentUrls(
-    supabase,
-    mapped.documents,
-    row.documents.map((doc) => doc.storageKey),
+  const mapped = mapApplicationWithChecks(row as unknown as PrismaApplicationBundle, await latestVerifications(row.documents.map((doc) => doc.id)))
+  mapped.documents = await Promise.all(
+    mapped.documents.map(async (doc, index) => {
+      const storageKey = row.documents[index]?.storageKey
+      if (!storageKey) return doc
+      try {
+        const signedUrl = await signedStoredUrl(storageKey, { disposition: "inline" })
+        return { ...doc, previewUrl: signedUrl, fileUrl: signedUrl }
+      } catch {
+        return doc
+      }
+    }),
   )
 
   return { prisma, profile, row, mapped, isAdmin }
@@ -390,18 +394,7 @@ export async function saveDraft(patch: Record<string, unknown>) {
 
   await prisma.application.update({ where: { id: appId }, data })
 
-  if (existing) {
-    return { id: appId, documents: [] } as unknown as Application
-  }
-
-  const documents = await prisma.document.findMany({
-    where: { applicationId: appId, deletedAt: null },
-    include: { type: true },
-  })
-  return {
-    id: appId,
-    documents: documents.map((doc) => mapPrismaDocument(doc)),
-  } as Application
+  return getApplication(appId)
 }
 
 async function seedDevelopmentSubmission(applicationId: string, profile: { fullName: string; email: string; phone: string | null }) {

@@ -17,7 +17,6 @@ import {
   ClipboardList,
   FileCheck2,
   Wallet,
-  Upload,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { PageHeader } from "@/components/page-header"
@@ -65,7 +64,6 @@ import { useRouter } from "next/navigation"
 import { copyAllPayload } from "@/lib/actions/export"
 import { updateStatus, requestCorrection } from "@/lib/actions/applications"
 import { verifyDocument, rejectDocument, signedGet } from "@/lib/actions/documents"
-import { DocumentUploadDialog } from "@/components/documents/document-upload-dialog"
 import { DocumentRejectDialog } from "@/components/documents/document-reject-dialog"
 import { DocumentStatusLabel } from "@/components/admin/status-badge"
 import { verifyDeposit } from "@/lib/actions/deposits"
@@ -120,7 +118,6 @@ export function ApplicationReview({
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const [docs, setDocs] = useState(application.documents)
-  const [uploadOpen, setUploadOpen] = useState(false)
   const [rejectOpen, setRejectOpen] = useState(false)
 
   const activeDoc = docs.find((d) => d.id === activeDocId) ?? docs[0]
@@ -396,10 +393,6 @@ export function ApplicationReview({
                 <span className="rounded-md bg-secondary px-2 py-1 text-xs font-medium text-muted-foreground">
                   {docs.length} Files
                 </span>
-                <Button size="sm" onClick={() => setUploadOpen(true)}>
-                  <Upload data-icon="inline-start" />
-                  Upload Document
-                </Button>
               </div>
             </header>
             <div className="grid grid-cols-1 sm:grid-cols-[220px_1fr]">
@@ -508,10 +501,6 @@ export function ApplicationReview({
                         </Button>
                       </>
                     )}
-                    <Button size="sm" variant="outline" onClick={() => setUploadOpen(true)}>
-                      <Upload data-icon="inline-start" />
-                      {activeDocStatus === "rejected" ? "Re-upload" : "Upload"}
-                    </Button>
                   </div>
                 </div>
               </div>
@@ -693,19 +682,6 @@ export function ApplicationReview({
           </div>
         </div>
       </div>
-      <DocumentUploadDialog
-        open={uploadOpen}
-        onOpenChange={setUploadOpen}
-        applicationId={application.id}
-        documents={docs}
-        initialType={activeDoc?.type}
-        live={live}
-        onComplete={(next) => {
-          setDocs(next)
-          const latest = next.find((doc) => doc.type === activeDoc?.type) ?? next[0]
-          if (latest) setActiveDocId(latest.id)
-        }}
-      />
       <DocumentRejectDialog
         open={rejectOpen}
         onOpenChange={setRejectOpen}

@@ -1,3 +1,5 @@
+import { getR2Env, isR2Configured as r2Configured, requireR2Env as requireR2 } from "@/lib/storage/r2-client"
+
 export function isPrismaConfigured() {
   return Boolean(process.env.DATABASE_URL)
 }
@@ -9,12 +11,7 @@ export function isSupabaseConfigured() {
 
 /** True when R2 signing credentials are present (server only). */
 export function isR2Configured() {
-  return Boolean(
-    process.env.R2_ACCESS_KEY_ID &&
-      process.env.R2_SECRET_ACCESS_KEY &&
-      process.env.R2_BUCKET &&
-      process.env.R2_ENDPOINT,
-  )
+  return r2Configured()
 }
 
 export function requireSupabasePublicEnv() {
@@ -27,19 +24,7 @@ export function requireSupabasePublicEnv() {
 }
 
 export function requireR2Env() {
-  const accessKeyId = process.env.R2_ACCESS_KEY_ID
-  const secretAccessKey = process.env.R2_SECRET_ACCESS_KEY
-  const bucket = process.env.R2_BUCKET
-  const endpoint = process.env.R2_ENDPOINT
-  if (!accessKeyId || !secretAccessKey || !bucket || !endpoint) {
-    throw new Error("Cloudflare R2 is not configured. Set R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, R2_BUCKET, and R2_ENDPOINT.")
-  }
-  return {
-    accessKeyId,
-    secretAccessKey,
-    bucket,
-    endpoint,
-    region: process.env.R2_REGION || "auto",
-    accountId: process.env.R2_ACCOUNT_ID,
-  }
+  return requireR2()
 }
+
+export { getR2Env }

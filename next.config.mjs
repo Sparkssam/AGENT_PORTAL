@@ -13,6 +13,11 @@ const nextConfig = {
     ],
   },
   serverExternalPackages: ["@prisma/client", "prisma", "sharp", "tesseract.js"],
+  // Allow document uploads through the Next.js proxy without truncating multipart bodies.
+  proxyClientMaxBodySize: "12mb",
+  serverActions: {
+    bodySizeLimit: "12mb",
+  },
   experimental: {
     staleTimes: {
       dynamic: 30,

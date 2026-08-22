@@ -10,6 +10,7 @@ import { cn } from "@/lib/utils"
 import type { Application, Document } from "@/lib/admin-data"
 import type { DocumentVerificationResult } from "@/lib/verification/types"
 import { saveDraft } from "@/lib/actions/applications"
+import { uploadDocumentWithFallback } from "@/lib/storage/client-upload"
 import { DOCUMENT_ACCEPT, DOCUMENT_TYPE_OPTIONS, documentTypeLabel, formatBytes, mimeFromFile, validateUploadFile } from "@/lib/documents/catalog"
 import { DocumentExampleArt } from "@/components/help/document-example-art"
 import { getDocumentExample } from "@/lib/help/document-examples"
@@ -176,18 +177,14 @@ export function DocumentUploadDialog({
         onApplicationReady?.(saved)
       }
 
-      const body = new FormData()
-      body.set("applicationId", targetId)
-      body.set("documentType", documentType)
-      body.set("file", file)
-      body.set("originalName", file.name)
-      body.set("mimeType", mimeFromFile(file))
-      body.set("fileSize", String(file.size))
-      body.set("uploadedAt", new Date().toISOString())
-      if (alreadyStored || replacingRejected || intent === "replace" || intent === "onBehalf") body.set("replace", "true")
-      if (intent === "onBehalf") body.set("onBehalf", "true")
-
-      const result = await uploadWithProgress(body, setProgress)
+      const result = await uploadDocumentWithFallback({
+        applicationId: targetId,
+        documentType,
+        file,
+        replace: alreadyStored || replacingRejected || intent === "replace" || intent === "onBehalf",
+        onBehalf: intent === "onBehalf",
+        onProgress: setProgress,
+      })
       setProgress(100)
       setPhase("success")
       onComplete(result.application.documents, result.verification)
@@ -455,38 +452,4 @@ export function DocumentUploadDialog({
       </DialogContent>
     </Dialog>
   )
-}
-
-function uploadWithProgress(
-  body: FormData,
-  onProgress: (value: number) => void,
-): Promise<{ application: Application; verification?: DocumentVerificationResult }> {
-  return new Promise((resolve, reject) => {
-    const xhr = new XMLHttpRequest()
-    xhr.open("POST", "/api/documents/upload")
-    xhr.withCredentials = true
-    xhr.upload.onprogress = (event) => {
-      if (!event.lengthComputable) return
-      onProgress(Math.max(8, Math.min(90, Math.round((event.loaded / event.total) * 90))))
-    }
-    xhr.onload = () => {
-      try {
-        const payload = JSON.parse(xhr.responseText || "{}") as {
-          application?: Application
-          verification?: DocumentVerificationResult
-          error?: string
-        }
-        if (xhr.status >= 200 && xhr.status < 300 && payload.application) {
-          onProgress(100)
-          resolve({ application: payload.application, verification: payload.verification })
-          return
-        }
-        reject(new Error(payload.error || "Upload failed"))
-      } catch {
-        reject(new Error("Upload failed"))
-      }
-    }
-    xhr.onerror = () => reject(new Error("Network error while uploading"))
-    xhr.send(body)
-  })
 }

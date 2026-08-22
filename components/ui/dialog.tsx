@@ -39,42 +39,79 @@ function DialogOverlay({
   )
 }
 
+const popupClassName =
+  "grid w-full gap-4 rounded-3xl bg-card text-sm text-card-foreground shadow-md ring-1 ring-border/60 duration-100 outline-none data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95"
+
+function DialogCloseButton() {
+  return (
+    <DialogPrimitive.Close
+      data-slot="dialog-close"
+      render={
+        <Button
+          variant="ghost"
+          className="absolute top-2 right-2"
+          size="icon-sm"
+        />
+      }
+    >
+      <XIcon />
+      <span className="sr-only">Close</span>
+    </DialogPrimitive.Close>
+  )
+}
+
 function DialogContent({
   className,
   children,
   showCloseButton = true,
+  scrollBehavior = "internal",
   ...props
 }: DialogPrimitive.Popup.Props & {
   showCloseButton?: boolean
+  /** viewport = scroll the whole modal via the screen overlay; no scroll inside the card */
+  scrollBehavior?: "internal" | "viewport"
 }) {
+  if (scrollBehavior === "viewport") {
+    return (
+      <DialogPortal>
+        <div
+          data-slot="dialog-viewport-scroll"
+          className="fixed inset-0 z-50 overflow-y-auto overscroll-y-contain"
+        >
+          <DialogOverlay className="fixed inset-0" />
+          <div className="relative z-50 flex min-h-full justify-center px-2 py-[2.5vh] sm:px-4">
+            <DialogPrimitive.Popup
+              data-slot="dialog-content"
+              className={cn(
+                popupClassName,
+                "relative mx-auto w-[95vw] max-w-[95vw] p-0 sm:max-w-[95vw]",
+                className
+              )}
+              {...props}
+            >
+              {children}
+              {showCloseButton && <DialogCloseButton />}
+            </DialogPrimitive.Popup>
+          </div>
+        </div>
+      </DialogPortal>
+    )
+  }
+
   return (
     <DialogPortal>
       <DialogOverlay />
       <DialogPrimitive.Popup
         data-slot="dialog-content"
         className={cn(
-          "fixed top-1/2 left-1/2 z-50 grid w-full max-w-[calc(100%-2rem)] -translate-x-1/2 -translate-y-1/2 gap-4 rounded-3xl bg-card p-6 text-sm text-card-foreground shadow-md ring-1 ring-border/60 duration-100 outline-none sm:max-w-sm data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95",
+          popupClassName,
+          "fixed top-1/2 left-1/2 z-50 max-w-[calc(100%-2rem)] -translate-x-1/2 -translate-y-1/2 p-6 sm:max-w-sm",
           className
         )}
         {...props}
       >
         {children}
-        {showCloseButton && (
-          <DialogPrimitive.Close
-            data-slot="dialog-close"
-            render={
-              <Button
-                variant="ghost"
-                className="absolute top-2 right-2"
-                size="icon-sm"
-              />
-            }
-          >
-            <XIcon
-            />
-            <span className="sr-only">Close</span>
-          </DialogPrimitive.Close>
-        )}
+        {showCloseButton && <DialogCloseButton />}
       </DialogPrimitive.Popup>
     </DialogPortal>
   )

@@ -44,7 +44,7 @@ export const BUSINESS_SECTORS = [
 ] as const
 
 export function sortBusinessSectors<T extends { code: string; name: string }>(sectors: T[]) {
-  const order = new Map(BUSINESS_SECTORS.map((item, index) => [item.code, index]))
+  const order = new Map<string, number>(BUSINESS_SECTORS.map((item, index) => [item.code, index]))
   return [...sectors].sort((a, b) => {
     const left = order.get(a.code) ?? 1000
     const right = order.get(b.code) ?? 1000

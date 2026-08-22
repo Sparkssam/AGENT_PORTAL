@@ -191,7 +191,7 @@ export function ApplicationWizard({
     fullName: application?.agentName || agent.fullName,
     phone: agent.phone,
     email: application?.email || agent.email,
-    idType: isAllowedIdType(application?.idType) ? application.idType : "",
+    idType: application && isAllowedIdType(application.idType) ? application.idType : "",
     idNumber: application?.idNumber ?? "",
     issuedPlace: application?.issuedPlace ?? "",
     issuedDate: dateInputValue(application?.issuedDate),
@@ -203,7 +203,7 @@ export function ApplicationWizard({
     channel: application?.channelId || application?.channel || "",
     channelParentType: CHANNEL_PARENT_TYPE,
     channelParentName: CHANNEL_PARENT_NAME,
-    channelManagerType: isChannelManagerType(application?.channelManagerType)
+    channelManagerType: application && isChannelManagerType(application.channelManagerType)
       ? application.channelManagerType
       : "",
     channelManagerName: CHANNEL_MANAGER_NAME,

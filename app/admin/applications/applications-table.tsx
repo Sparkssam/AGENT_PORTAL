@@ -2,10 +2,11 @@
 
 import { useEffect, useMemo, useState } from "react"
 import Link from "next/link"
-import { Download, Search } from "lucide-react"
+import { ClipboardList, Download, Search } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
+import { ApplicationReviewModal } from "@/components/admin/application-review-modal"
 import {
   Select,
   SelectContent,
@@ -77,6 +78,8 @@ export function ApplicationsTable({
   const [rejectNote, setRejectNote] = useState("")
   const [busy, setBusy] = useState(false)
   const [message, setMessage] = useState<string | null>(null)
+  const [reviewAppId, setReviewAppId] = useState<string | null>(null)
+  const [reviewOpen, setReviewOpen] = useState(false)
 
   useEffect(() => {
     setQuery(initialQuery)
@@ -292,6 +295,7 @@ export function ApplicationsTable({
                 <th className="px-4 py-3 hidden lg:table-cell">Health</th>
                 <th className="px-4 py-3">App Status</th>
                 <th className="px-4 py-3 hidden sm:table-cell">Dep. Status</th>
+                <th className="px-4 py-3 text-right">Action</th>
               </tr>
             </thead>
             <tbody>
@@ -336,11 +340,25 @@ export function ApplicationsTable({
                   <td className="px-4 py-3.5 hidden sm:table-cell">
                     <DepositStatusBadge status={app.depositStatus} />
                   </td>
+                  <td className="px-4 py-3.5 text-right">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        setReviewAppId(app.id)
+                        setReviewOpen(true)
+                      }}
+                      aria-label={`Review ${app.appNumber}`}
+                    >
+                      <ClipboardList data-icon="inline-start" />
+                      Review
+                    </Button>
+                  </td>
                 </tr>
               )})}
               {paged.length === 0 && (
                 <tr>
-                  <td colSpan={9} className="portal-empty">
+                  <td colSpan={10} className="portal-empty">
                     <p className="portal-empty-title">No applications match</p>
                     <p className="portal-empty-copy">Try a different search, or clear a filter.</p>
                   </td>
@@ -385,6 +403,17 @@ export function ApplicationsTable({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <ApplicationReviewModal
+        applicationId={reviewAppId}
+        open={reviewOpen}
+        onOpenChange={(open) => {
+          setReviewOpen(open)
+          if (!open) setReviewAppId(null)
+        }}
+        live={live}
+        initialApplication={applications.find((app) => app.id === reviewAppId)}
+      />
     </div>
   )
 }

@@ -53,16 +53,12 @@ export function CorrectionChecklist({
   summary,
   fixHref = "/agent/apply",
   showFix = true,
-  agentName,
-  applicationNumber,
 }: {
   documents: Document[]
   items?: CorrectionItem[]
   summary?: string
   fixHref?: string
   showFix?: boolean
-  agentName?: string
-  applicationNumber?: string
 }) {
   const needsWork = documents.filter((d) => d.status === "rejected" || d.status === "missing").length
   const fieldItems = items.filter((item) => item.kind === "field")
@@ -132,15 +128,7 @@ export function CorrectionChecklist({
                 {(requested?.reason || (doc.reason && actionable)) && (
                   <p className="mt-0.5 text-xs text-muted-foreground">{requested?.reason || doc.reason}</p>
                 )}
-                {doc.status === "rejected" ? (
-                  <RejectedDocumentHelp
-                    agentName={agentName}
-                    applicationNumber={applicationNumber}
-                    documentType={doc.type}
-                    documentName={doc.name}
-                    reason={requested?.reason || doc.reason}
-                  />
-                ) : null}
+                {doc.status === "rejected" ? <RejectedDocumentHelp /> : null}
                 {doc.status === "missing" && !doc.reason && !requested && (
                   <p className="mt-0.5 text-xs text-muted-foreground">Not uploaded yet.</p>
                 )}

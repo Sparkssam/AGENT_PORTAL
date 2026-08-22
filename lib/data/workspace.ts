@@ -60,7 +60,7 @@ function setupFrom(error: unknown) {
     return {
       mode: "setup" as const,
       message:
-        "Cannot reach Postgres. Use the Supabase pooler: DATABASE_URL on port 6543 with ?pgbouncer=true&sslmode=require, and DIRECT_URL on port 5432 with sslmode=require. Confirm the project is not paused.",
+        "Cannot reach Postgres. Prisma needs the Supabase session pooler on port 5432 with sslmode=require (not the transaction pooler on 6543). Confirm DATABASE_URL and DIRECT_URL, and that the project is not paused.",
     }
   }
   if (/does not exist|schema cache|P2021|relation .* does not exist/i.test(raw)) {

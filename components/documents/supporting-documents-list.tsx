@@ -45,8 +45,6 @@ export function SupportingDocumentsList({
   applicationStatus,
   includeDepositProof = false,
   framed = true,
-  agentName,
-  applicationNumber,
   onDocumentsChange,
   onApplicationReady,
   onError,
@@ -58,8 +56,6 @@ export function SupportingDocumentsList({
   applicationStatus?: AppStatus
   includeDepositProof?: boolean
   framed?: boolean
-  agentName?: string
-  applicationNumber?: string
   onDocumentsChange: (documents: Document[]) => void
   onApplicationReady?: (application: Application) => void
   onError?: (message: string | null) => void
@@ -261,15 +257,7 @@ export function SupportingDocumentsList({
                 </div>
               )}
               </div>
-              {rejected ? (
-                <RejectedDocumentHelp
-                  agentName={agentName}
-                  applicationNumber={applicationNumber}
-                  documentType={doc.type}
-                  documentName={doc.name}
-                  reason={doc.reason}
-                />
-              ) : null}
+              {rejected ? <RejectedDocumentHelp /> : null}
             </li>
           )
         })}

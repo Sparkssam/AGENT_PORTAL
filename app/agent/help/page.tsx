@@ -41,6 +41,17 @@ export default async function HelpCenterPage() {
       </section>
 
       <HelpFaqList />
+
+      <div className="portal-card-muted">
+        <p className="portal-card-title">Still stuck?</p>
+        <p className="mt-2 text-sm text-muted-foreground">
+          If the FAQ does not cover it, chat with support on WhatsApp. Your name and application number are included
+          in the message.
+        </p>
+        <div className="mt-5">
+          <WhatsAppSupportButton agentName={agent.fullName} applicationNumber={application.appNumber} />
+        </div>
+      </div>
     </div>
   )
 }

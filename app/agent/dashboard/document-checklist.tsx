@@ -77,15 +77,7 @@ export function AgentDocumentChecklist({
                 </Button>
               )}
               </div>
-              {doc.status === "rejected" ? (
-                <RejectedDocumentHelp
-                  agentName={app.agentName}
-                  applicationNumber={app.appNumber}
-                  documentType={doc.type}
-                  documentName={doc.name}
-                  reason={doc.reason}
-                />
-              ) : null}
+              {doc.status === "rejected" ? <RejectedDocumentHelp /> : null}
             </li>
           )
         })}
